@@ -1,0 +1,42 @@
+schema_version = 1
+
+[project]
+id = "synthetic-calculator"
+repository = "synthetic/calculator"
+provider = "local"
+base_branch = "main"
+languages = ["python"]
+frameworks = ["unittest"]
+
+[instructions]
+files = ["AGENTS.md"]
+
+[security]
+policy_files = ["SECURITY.md"]
+protected_paths = ["automation/**", ".developer-team/**"]
+
+[[checks]]
+name = "unit"
+kind = "test"
+argv = ["python3", "-m", "unittest", "discover", "-s", "tests", "-v"]
+timeout_seconds = 15
+required = true
+
+[[checks]]
+name = "build"
+kind = "build"
+argv = ["python3", "-c", "from pathlib import Path; compile(Path('calculator.py').read_text(), 'calculator.py', 'exec')"]
+timeout_seconds = 10
+required = true
+
+[merge]
+enabled = false
+method = "squash"
+
+[limits]
+max_repairs_per_class = 3
+max_steps = 60
+
+[delivery]
+test_paths = ["tests/**"]
+documentation_paths = ["docs/**", "README.md"]

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "developer-team"
+version = "0.1.0"
+description = "Fail-closed, adapter-based autonomous developer team (DT-001 safe test mode)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+developer-team = "developer_team.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["developer_team*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S"]
+ignore = ["S603", "S607"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.coverage.run]
+source = ["developer_team"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
