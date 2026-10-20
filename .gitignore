@@ -218,3 +218,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Controller-local audit state and credentials must never be committed.
+.developer-team-runs/
+*.sqlite3
+*.sqlite3-*
+*.lock
+auth.json
+*.pem
+*.key
