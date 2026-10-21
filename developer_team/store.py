@@ -216,3 +216,65 @@ class RunStore:
             ).fetchone()
         if row is None or row[0] != limits_digest or not 0 <= now - row[1] < runtime:
             raise TeamError("Cloud approval changed or total runtime limit reached")
+
+    def initialize_exec_journal(self) -> None:
+        # Keep the Cloud checkpoint schema unchanged; exec journals are not portable
+        # Cloud sessions and must be rejected by the existing Cloud import checks.
+        with self.connect() as connection:
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS exec_calls ("
+                "id TEXT PRIMARY KEY, run_id TEXT NOT NULL, payload TEXT NOT NULL)"
+            )
+
+    def reserve_exec_call(self, record: dict, now: float) -> None:
+        """Atomic exec intent + total call/runtime budget, separate from Cloud."""
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            rows = connection.execute(
+                "SELECT payload FROM exec_calls WHERE run_id = ?", (record["run_id"],)
+            ).fetchall()
+            previous = [json.loads(row[0]) for row in rows]
+            limits = record["limits"]
+            if previous and (
+                any(p["limits"] != limits for p in previous)
+                or not 0 <= now - min(p["created_at"] for p in previous) < limits["runtime_seconds"]
+            ):
+                raise TeamError("Exec limits changed or runtime exhausted")
+            if len(previous) >= limits["max_calls"]:
+                raise TeamError("Exec call budget exhausted")
+            try:
+                connection.execute(
+                    "INSERT INTO exec_calls VALUES (?, ?, ?)",
+                    (record["id"], record["run_id"], json.dumps(record, sort_keys=True)),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise TeamError("Exec intent already exists; reconcile manually, never retry") from exc
+            connection.execute(
+                "INSERT INTO events(run_id, kind, payload) VALUES (?, 'exec:intent', ?)",
+                (record["run_id"], json.dumps(record, sort_keys=True)),
+            )
+
+    def finish_exec_call(self, record: dict) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE exec_calls SET payload = ? WHERE id = ?",
+                (json.dumps(record, sort_keys=True), record["id"]),
+            )
+            connection.execute(
+                "INSERT INTO events(run_id, kind, payload) VALUES (?, ?, ?)",
+                (record["run_id"], "exec:" + record["state"], json.dumps(record, sort_keys=True)),
+            )
+
+    def exec_calls(self, run_id: str) -> list[dict]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT payload FROM exec_calls WHERE run_id = ? ORDER BY rowid", (run_id,)
+            ).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    def check_exec_runtime(self, run_id: str, now: float) -> None:
+        records = self.exec_calls(run_id)
+        if not records or not (
+            0 <= now - records[0]["created_at"] < records[0]["limits"]["runtime_seconds"]
+        ):
+            raise TeamError("Exec total runtime exhausted; discard output")
