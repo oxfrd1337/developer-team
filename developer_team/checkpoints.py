@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from .adapters.cloud_contracts import fields, strict_json
@@ -36,7 +37,10 @@ def checkpoint(root: Path, output: Path) -> dict:
         workspace = GitWorkspace(root / "project")
         workspace.assert_clean()
         destination = empty_directory(output)
-        with store.connect() as source, sqlite3.connect(destination / "state.sqlite3") as target:
+        with (
+            store.connect() as source,
+            closing(sqlite3.connect(destination / "state.sqlite3")) as target,
+        ):
             source.backup(target)
         (destination / "session.json").write_bytes((root / "session.json").read_bytes())
         workspace.git("bundle", "create", str(destination / "checkout.bundle"), "HEAD")
@@ -86,8 +90,8 @@ def restore_checkpoint(
         (destination / name).write_bytes((checkpoint_path / name).read_bytes())
         (destination / name).chmod(0o600)
     try:
-        with sqlite3.connect(
-            (destination / "state.sqlite3").as_uri() + "?mode=ro", uri=True
+        with closing(
+            sqlite3.connect((destination / "state.sqlite3").as_uri() + "?mode=ro", uri=True)
         ) as connection:
             if connection.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
                 raise TeamError("Checkpoint SQLite integrity check failed")
