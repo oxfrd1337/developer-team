@@ -155,7 +155,6 @@ class CodexCloudAgents(StructuredAgents):
         self.gateway.store.save_cloud_task(record, "source_imported")
 
 
-
 class CloudPreviewDelivery:
     """A local handoff preview, with no remote PR, merge or activation side effects."""
 

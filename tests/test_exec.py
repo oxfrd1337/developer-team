@@ -75,7 +75,7 @@ class ExecTests(unittest.TestCase):
             "raise SystemExit(2)",
             "import os; os.write(1, b'\\xff')",
             "print('{}')",
-            "print('{\"x\":1,\"x\":2}')",
+            'print(\'{"x":1,"x":2}\')',
             "import os, signal; os.kill(os.getpid(), signal.SIGTERM)",
         ):
             with self.subTest(source=source):
