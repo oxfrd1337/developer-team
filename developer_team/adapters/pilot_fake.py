@@ -7,13 +7,8 @@ import json
 from datetime import UTC, datetime
 
 from ..models import Role, TeamError
+from ..pilot_scope import PILOT_WRITABLE
 from .cloud_contracts import RESULT_PATH, CloudJob
-
-PILOT_WRITABLE = (
-    "pilot_project/calculator.py",
-    "pilot_project/tests/test_calculator.py",
-    "pilot_project/usage.md",
-)
 
 
 def _patch(path: str, old: str | None, new: str) -> str:

@@ -87,6 +87,9 @@ class CodexCloudGateway:
         now=time.time,
     ):
         self.runner, self.store, self.refs, self.now = runner, store, refs, now
+        # An injected runner is test evidence unless separately verified; never
+        # label prepared CLI responses as observed Cloud execution in pilot reports.
+        self.simulated = runner is not run_cli
 
     def probe(self) -> dict:
         version = self.runner(["codex", "--version"])
@@ -342,6 +345,12 @@ class CodexCloudGateway:
                     "error",
                 ) or not status_text.startswith(f"[{status.upper()}] "):
                     raise TeamError("Unknown or conflicting cloud statuses")
+                record.update(
+                    provider_status=status,
+                    provider_updated_at=metadata["updated_at"],
+                    provider_attempts=attempts,
+                )
+                self.store.save_cloud_task(record, "status_observed")
                 if status in ("error", "applied"):
                     record["state"] = "failed"
                     self.store.save_cloud_task(record, "failed_or_externally_applied")

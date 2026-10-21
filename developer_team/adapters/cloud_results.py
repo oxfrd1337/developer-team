@@ -2,19 +2,28 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 
 from ..config import ProjectConfig, matches, relative_path
-from ..models import Role, TeamError
+from ..models import Origin, Role, TeamError, digest
 from ..workspace import GitWorkspace
 from .cloud_contracts import RESULT_PATH, CloudJob, strict_json
 
 
 class CloudResultImporter:
-    def __init__(self, *, allowed_paths: tuple[str, ...] | None = None):
+    def __init__(
+        self,
+        *,
+        allowed_paths: tuple[str, ...] | None = None,
+        audit_directory: Path | None = None,
+        simulated: bool = True,
+    ):
         # Controller-owned scope; project instructions cannot widen it.
         self.allowed_paths = allowed_paths
+        self.audit_directory = audit_directory
+        self.simulated = simulated
 
     def extract(
         self, workspace: GitWorkspace, config: ProjectConfig, job: CloudJob, patch: str
@@ -73,6 +82,20 @@ class CloudResultImporter:
                 "diff", "--cached", "--no-ext-diff", "--no-textconv", strip=False
             )
             workspace.assert_clean(job.head_sha)
+            if self.audit_directory is not None:
+                # Only validated, scoped output is retained, outside the agent checkout.
+                self.audit_directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+                artifact = self.audit_directory / f"{job.id}-{digest(patch)}.json"
+                data = job.envelope() | {
+                    "payload": payload,
+                    "patch_digest": digest(patch),
+                    "source_patch": source_patch,
+                    "execution_attested": False,
+                    "origin": Origin.SIMULATED if self.simulated else Origin.CODEX_CLOUD,
+                }
+                with artifact.open("w", encoding="utf-8") as stream:
+                    artifact.chmod(0o600)
+                    json.dump(data, stream, indent=2, sort_keys=True)
             return payload, source_patch
 
     def apply(self, workspace: GitWorkspace, job: CloudJob, patch: str) -> None:
