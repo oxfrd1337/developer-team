@@ -274,6 +274,26 @@ class RunStore:
             ).fetchall()
         return [json.loads(row[0]) for row in rows]
 
+    def record_exec_verification(self, job_id: str, verification: dict) -> None:
+        """Diagnostic provenance only; this journal cannot issue trusted receipts."""
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT payload FROM exec_calls WHERE id = ?", (job_id,)
+            ).fetchone()
+            record = json.loads(row[0]) if row else {}
+            if record.get("state") != "completed" or "controller_verification" in record:
+                raise TeamError("Exec verification requires a unique completed transport")
+            record["controller_verification"] = verification
+            payload = json.dumps(record, sort_keys=True)
+            connection.execute(
+                "UPDATE exec_calls SET payload = ? WHERE id = ?", (payload, job_id)
+            )
+            connection.execute(
+                "INSERT INTO events(run_id, kind, payload) VALUES (?, 'exec:controller-verified', ?)",
+                (record["run_id"], payload),
+            )
+
     def check_exec_runtime(self, run_id: str, now: float) -> None:
         records = self.exec_calls(run_id)
         if not records or not (

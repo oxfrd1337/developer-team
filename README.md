@@ -106,3 +106,11 @@ Der optionale Exec-Adapter nutzt die bestehenden Engine-Stufen ausschließlich m
 lokalen CLI-Simulatoren. Echte Aufrufe bleiben technisch gesperrt. Architektur,
 Sicherheitsanalyse und die NO-GO-Entscheidung für einen beaufsichtigten Pilot stehen
 in [docs/dt-005.md](docs/dt-005.md).
+
+## DT-006: aktuelle Sicherheitsprüfung
+
+Der echte Exec-Agentenlauf bleibt technisch gesperrt. Die Offline-Probes und
+zusätzlichen controllerseitigen Snapshotprüfungen sind in [DT-006](docs/dt-006.md)
+beschrieben; offene Host-/Credential-/Netz-/Supervisorgrenzen und die nächste
+Freigabeentscheidung stehen dort zusammen mit dem Risikoregister.
+Prüfergebnisse: [Validierungsprotokoll](docs/dt-006-validation.md).

@@ -189,8 +189,93 @@ assert resource.getrlimit(resource.RLIMIT_CORE)[0] == 0
         self.assertNotEqual(calls[2]["snapshot"], calls[3]["snapshot"])
         self.assertTrue(all(not Path(c["snapshot"]).exists() for c in calls))
         self.assertTrue(all(c["simulated"] for c in calls))
+        verified = [c["controller_verification"] for c in calls]
+        self.assertTrue(all(v["source"] == "controller:exec-result-validator-v1" for v in verified))
+        self.assertTrue(all(v["execution_attested"] is False for v in verified))
+        self.assertEqual(verified[2]["content_digest"], verified[3]["content_digest"])
+        self.assertEqual(
+            verified[2]["controller_checks_digest"], verified[3]["controller_checks_digest"]
+        )
+        self.assertNotEqual(verified[2]["inventory_digest"], verified[3]["inventory_digest"])
+        self.assertEqual(
+            sum(e["kind"] == "exec:controller-verified" for e in self.store.events(run.id)), 4
+        )
         self.assertTrue(all(e.origin.value != "codex_cloud" for e in run.evidence))
         self.assertEqual(delivery.merge_calls, 0)
+
+    def test_hidden_and_cross_controller_mutations_block_independent_verification(self):
+        original = SimulatedExecProcess.run
+        for mode in ("ignored", "git-config", "controller"):
+            with self.subTest(mode=mode):
+                other = ExecTests()
+                other.setUp()
+                try:
+                    engine, delivery = other.engine()
+
+                    def mutate(
+                        simulator,
+                        argv,
+                        root,
+                        limits,
+                        *,
+                        mutation=mode,
+                        controller=engine.workspace.root,
+                    ):
+                        raw = original(simulator, argv, root, limits)
+                        role = json.loads(argv[-1])["job"]["binding"]["role"]
+                        if role == "qa":
+                            if mutation == "ignored":
+                                exclude = root / ".git/info/exclude"
+                                exclude.write_text(exclude.read_text() + "\nhidden-output\n")
+                                (root / "hidden-output").write_text("synthetic tampering")
+                            elif mutation == "git-config":
+                                config = root / ".git/config"
+                                config.write_text(config.read_text() + "\n# synthetic mutation\n")
+                            else:
+                                config = controller / ".git/config"
+                                config.write_text(config.read_text() + "\n# synthetic mutation\n")
+                        return raw
+
+                    with patch.object(SimulatedExecProcess, "run", mutate):
+                        run = engine.execute("happy")
+                    self.assertEqual(run.status, RunStatus.ESCALATED, run.reasons)
+                    self.assertIn("mutated", " ".join(run.reasons))
+                    calls = other.store.exec_calls(run.id)
+                    self.assertNotIn("controller_verification", calls[-1])
+                    self.assertEqual(delivery.merge_calls, 0)
+                finally:
+                    other.doCleanups()
+
+    def test_simulator_test_claims_cannot_replace_failing_controller_checks(self):
+        from developer_team.execution import SyntheticCommandRunner
+
+        engine, delivery = self.engine()
+        engine.runner = SyntheticCommandRunner(audit_directory=self.root / "checks")
+        original = SyntheticCommandRunner.run
+
+        def failing_check(runner, check, root):
+            failing = replace(check, argv=(sys.executable, "-I", "-c", "raise SystemExit(7)"))
+            return original(runner, failing, root)
+
+        with patch.object(SyntheticCommandRunner, "run", failing_check):
+            run = engine.execute("happy")
+        self.assertEqual(run.status, RunStatus.ESCALATED, run.reasons)
+        results = [json.loads(p.read_text()) for p in (self.root / "checks").glob("*.json")]
+        self.assertTrue(results)
+        self.assertTrue(all(r["returncode"] == 7 and r["outcome"] == "fail" for r in results))
+        self.assertFalse(
+            any(c["job"]["role"] in ("qa", "security") for c in self.store.exec_calls(run.id))
+        )
+        self.assertEqual(delivery.merge_calls, 0)
+
+    def test_verification_diagnostics_require_completed_transport_and_are_not_reissued(self):
+        gateway = self.gateway(self.envelope_source())
+        with self.assertRaisesRegex(TeamError, "unique completed"):
+            self.store.record_exec_verification(self.job.id, {"execution_attested": True})
+        gateway.execute(self.job, self.root, "hello")
+        self.store.record_exec_verification(self.job.id, {"execution_attested": False})
+        with self.assertRaisesRegex(TeamError, "unique completed"):
+            self.store.record_exec_verification(self.job.id, {"execution_attested": True})
 
     def test_protected_patch_review_mutation_and_contradictory_pass_escalate(self):
         for mode, reason in (

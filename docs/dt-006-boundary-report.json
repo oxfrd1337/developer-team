@@ -1,0 +1,454 @@
+{
+  "ai_calls": 0,
+  "collected_at": "2026-10-21T21:13:27.793009+00:00",
+  "decision": "NO-GO",
+  "host": {
+    "kernel": "6.18.55",
+    "system": "Linux"
+  },
+  "live_dispatch_authorized": false,
+  "probe_source_sha256": "9b063407143699b15f92a8228496d321d413eb4e7bd1b5ceb88c0b044109c413",
+  "probes": {
+    "credential-broker": {
+      "reason": "No verified ChatGPT credential broker separate from tool processes",
+      "status": "UNSUPPORTED"
+    },
+    "developer:abstract-socket": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "developer:canary-integrity": {
+      "status": "PASS"
+    },
+    "developer:controller-write": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "developer:credential-read": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "developer:cross-role-read:orchestrator": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "developer:cross-role-read:qa": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "developer:cross-role-read:security": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "developer:cross-role-write:orchestrator": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "developer:cross-role-write:qa": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "developer:cross-role-write:security": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "developer:dns": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "developer:git-write": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "developer:host-proc-read": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "developer:http": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "developer:namespace-separation": {
+      "namespaces": {
+        "ipc": "ipc:[4026532276]",
+        "mnt": "mnt:[4026532272]",
+        "net": "net:[4026532282]",
+        "pid": "pid:[4026532277]",
+        "user": "user:[4026532467]",
+        "uts": "uts:[4026532274]"
+      },
+      "status": "PASS",
+      "uid": 1000
+    },
+    "developer:private-output": {
+      "status": "PASS"
+    },
+    "developer:role-signal": {
+      "errno": 3,
+      "status": "PASS"
+    },
+    "developer:snapshot-chmod": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "developer:snapshot-delete": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "developer:snapshot-rename": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "developer:snapshot-write": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "developer:supervisor-signal": {
+      "errno": 3,
+      "status": "PASS"
+    },
+    "developer:tcp": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "developer:unix-socket": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "external-supervisor": {
+      "reason": "No independent kill/lease/cgroup cleanup after controller SIGKILL",
+      "status": "UNSUPPORTED"
+    },
+    "host-role-identities": {
+      "reason": "User namespaces do not establish separate host UID/VM identities",
+      "status": "UNSUPPORTED"
+    },
+    "model-only-egress": {
+      "reason": "No external model-only policy or authenticated broker verified",
+      "status": "UNSUPPORTED"
+    },
+    "namespace-prerequisite": {
+      "namespaces": {
+        "ipc": "ipc:[4026532272]",
+        "mnt": "mnt:[4026532269]",
+        "net": "net:[4026532275]",
+        "pid": "pid:[4026532273]",
+        "user": "user:[4026532374]",
+        "uts": "uts:[4026532271]"
+      },
+      "status": "PASS"
+    },
+    "orchestrator:abstract-socket": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "orchestrator:canary-integrity": {
+      "status": "PASS"
+    },
+    "orchestrator:controller-write": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "orchestrator:credential-read": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "orchestrator:cross-role-read:developer": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "orchestrator:cross-role-read:qa": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "orchestrator:cross-role-read:security": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "orchestrator:cross-role-write:developer": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "orchestrator:cross-role-write:qa": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "orchestrator:cross-role-write:security": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "orchestrator:dns": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "orchestrator:git-write": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "orchestrator:host-proc-read": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "orchestrator:http": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "orchestrator:namespace-separation": {
+      "namespaces": {
+        "ipc": "ipc:[4026532322]",
+        "mnt": "mnt:[4026532271]",
+        "net": "net:[4026532377]",
+        "pid": "pid:[4026532373]",
+        "user": "user:[4026532462]",
+        "uts": "uts:[4026532274]"
+      },
+      "status": "PASS",
+      "uid": 1000
+    },
+    "orchestrator:private-output": {
+      "status": "PASS"
+    },
+    "orchestrator:role-signal": {
+      "errno": 3,
+      "status": "PASS"
+    },
+    "orchestrator:snapshot-chmod": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "orchestrator:snapshot-delete": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "orchestrator:snapshot-rename": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "orchestrator:snapshot-write": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "orchestrator:supervisor-signal": {
+      "errno": 3,
+      "status": "PASS"
+    },
+    "orchestrator:tcp": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "orchestrator:unix-socket": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "qa:abstract-socket": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "qa:canary-integrity": {
+      "status": "PASS"
+    },
+    "qa:controller-write": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "qa:credential-read": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "qa:cross-role-read:developer": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "qa:cross-role-read:orchestrator": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "qa:cross-role-read:security": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "qa:cross-role-write:developer": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "qa:cross-role-write:orchestrator": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "qa:cross-role-write:security": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "qa:dns": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "qa:git-write": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "qa:host-proc-read": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "qa:http": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "qa:namespace-separation": {
+      "namespaces": {
+        "ipc": "ipc:[4026532322]",
+        "mnt": "mnt:[4026532274]",
+        "net": "net:[4026532381]",
+        "pid": "pid:[4026532379]",
+        "user": "user:[4026532471]",
+        "uts": "uts:[4026532279]"
+      },
+      "status": "PASS",
+      "uid": 1000
+    },
+    "qa:private-output": {
+      "status": "PASS"
+    },
+    "qa:role-signal": {
+      "errno": 3,
+      "status": "PASS"
+    },
+    "qa:snapshot-chmod": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "qa:snapshot-delete": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "qa:snapshot-rename": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "qa:snapshot-write": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "qa:supervisor-signal": {
+      "errno": 3,
+      "status": "PASS"
+    },
+    "qa:tcp": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "qa:unix-socket": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "resource-enforcement": {
+      "reason": "No externally bounded aggregate CPU/memory/PIDs verified",
+      "status": "UNSUPPORTED"
+    },
+    "security:abstract-socket": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "security:canary-integrity": {
+      "status": "PASS"
+    },
+    "security:controller-write": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "security:credential-read": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "security:cross-role-read:developer": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "security:cross-role-read:orchestrator": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "security:cross-role-read:qa": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "security:cross-role-write:developer": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "security:cross-role-write:orchestrator": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "security:cross-role-write:qa": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "security:dns": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "security:git-write": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "security:host-proc-read": {
+      "errno": 2,
+      "status": "PASS"
+    },
+    "security:http": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "security:namespace-separation": {
+      "namespaces": {
+        "ipc": "ipc:[4026532328]",
+        "mnt": "mnt:[4026532276]",
+        "net": "net:[4026532466]",
+        "pid": "pid:[4026532377]",
+        "user": "user:[4026532542]",
+        "uts": "uts:[4026532279]"
+      },
+      "status": "PASS",
+      "uid": 1000
+    },
+    "security:private-output": {
+      "status": "PASS"
+    },
+    "security:role-signal": {
+      "errno": 3,
+      "status": "PASS"
+    },
+    "security:snapshot-chmod": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "security:snapshot-delete": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "security:snapshot-rename": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "security:snapshot-write": {
+      "errno": 30,
+      "status": "PASS"
+    },
+    "security:supervisor-signal": {
+      "errno": 3,
+      "status": "PASS"
+    },
+    "security:tcp": {
+      "errno": 111,
+      "status": "PASS"
+    },
+    "security:unix-socket": {
+      "errno": 2,
+      "status": "PASS"
+    }
+  },
+  "schema_version": 1,
+  "scope": "current-executor-only; not a Codespaces attestation"
+}
