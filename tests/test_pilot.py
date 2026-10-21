@@ -21,7 +21,7 @@ from developer_team.checkpoints import (
 )
 from developer_team.cli import main
 from developer_team.execution import SyntheticCommandRunner
-from developer_team.models import IntegrationUnavailable, TeamError
+from developer_team.models import IntegrationUnavailable, Origin, TeamError
 from developer_team.pilot import (
     PILOT_REPOSITORY,
     prepare_session,
@@ -86,6 +86,9 @@ class PilotTests(unittest.TestCase):
         self.assertIsNotNone(run.plan)
         self.assertIsNotNone(run.architecture)
         self.assertEqual(run.pr.number, 0)
+        self.assertEqual(
+            {e.origin for e in run.evidence}, {Origin.SIMULATED, Origin.LOCAL_EXECUTION}
+        )
 
     def test_initial_acceptance_fails_and_is_executed_after_real_local_change(self):
         session = read_session(self.session)

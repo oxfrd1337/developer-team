@@ -46,6 +46,13 @@ Suiten erneut mit jeweils 147 erfolgreichen Tests ausgeführt; die vorherigen
 Beobachtet: [Actions-Lauf 39580481239](https://github.com/oxfrd1337/developer-team/actions/runs/39580481239)
 zu PR-Head `e81c28a3a779020e82c955bd9caac182e2df6c7b`.
 
+Auch [Lauf 39580980721](https://github.com/oxfrd1337/developer-team/actions/runs/39580980721)
+am Head `d2a74901b97c3dcd37cc8563c10a1df0b0ff3614` ist vollständig erfolgreich;
+dieser Lauf enthält die Korrektur zum expliziten Schließen der SQLite-Verbindungen.
+Die abschließende Testadapter-Verdrahtung kennzeichnet zusätzlich sämtliche
+Agentenbelege bereits im rohen SQLite-Audit als `simulated`; die lokalen Suiten
+wurden damit erneut erfolgreich ausgeführt (jeweils 147 Tests, weiterhin 90 % Abdeckung).
+
 | Tatsächlich abgeschlossener Job | Ergebnis |
 | --- | --- |
 | Python 3.11 / synthetic safety suite | Erfolgreich, einschließlich Lint, Format, Tests, Coverage, Build und bestehendem Smoke-Lauf |

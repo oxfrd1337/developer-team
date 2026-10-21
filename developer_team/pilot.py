@@ -19,7 +19,7 @@ from .adapters.pilot_fake import PILOT_WRITABLE, RehearsalCLI, RehearsalRefs
 from .authority import ProjectGrant, RuntimePolicy
 from .config import load_config
 from .engine import Engine
-from .models import Role, RunStatus, TeamError
+from .models import Origin, Role, RunStatus, TeamError
 from .store import RunStore
 from .workspace import GitWorkspace
 
@@ -195,14 +195,25 @@ def rehearsal_engine(root: Path, session: dict) -> Engine:
         now=lambda: session["simulation_time"],
     )
     agents = CodexCloudAgents(gateway, approval, grant, policy)
+    # Even the raw audit evidence must identify fake provider responses as simulated.
+    agents.simulated = True
+    agents.review_origin = Origin.SIMULATED
     agents.importer = CloudResultImporter(allowed_paths=PILOT_WRITABLE)
+    authority = cloud_authority(grant)
+    authority.issuers = {
+        issuer: (
+            role,
+            frozenset({Origin.SIMULATED}) if issuer.startswith("codex-cloud:") else origins,
+        )
+        for issuer, (role, origins) in authority.issuers.items()
+    }
     return Engine(
         config=config,
         workspace=workspace,
         agents=agents,
         delivery=CloudPreviewDelivery(workspace, config.repository),
         store=store,
-        authority=cloud_authority(grant),
+        authority=authority,
         grant=grant,
         policy=policy,
     )
