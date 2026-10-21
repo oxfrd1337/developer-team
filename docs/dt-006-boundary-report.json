@@ -1,13 +1,13 @@
 {
   "ai_calls": 0,
-  "collected_at": "2026-10-21T21:31:49.425841+00:00",
+  "collected_at": "2026-10-21T21:37:55.932321+00:00",
   "decision": "NO-GO",
   "host": {
     "kernel": "6.18.55",
     "system": "Linux"
   },
   "live_dispatch_authorized": false,
-  "probe_source_sha256": "9b063407143699b15f92a8228496d321d413eb4e7bd1b5ceb88c0b044109c413",
+  "probe_source_sha256": "fc38eb41ee8950df267d423184ea4409e16d0addfc3a6e73d8cc1bcc98819eb0",
   "probes": {
     "credential-broker": {
       "reason": "No verified ChatGPT credential broker separate from tool processes",
@@ -70,12 +70,12 @@
     },
     "developer:namespace-separation": {
       "namespaces": {
-        "ipc": "ipc:[4026532346]",
-        "mnt": "mnt:[4026532343]",
-        "net": "net:[4026532352]",
-        "pid": "pid:[4026532349]",
-        "user": "user:[4026532399]",
-        "uts": "uts:[4026532345]"
+        "ipc": "ipc:[4026532390]",
+        "mnt": "mnt:[4026532376]",
+        "net": "net:[4026532394]",
+        "pid": "pid:[4026532391]",
+        "user": "user:[4026532387]",
+        "uts": "uts:[4026532386]"
       },
       "status": "PASS",
       "uid": 1000
@@ -129,12 +129,12 @@
     },
     "namespace-prerequisite": {
       "namespaces": {
-        "ipc": "ipc:[4026532343]",
-        "mnt": "mnt:[4026532338]",
-        "net": "net:[4026532346]",
-        "pid": "pid:[4026532344]",
-        "user": "user:[4026532465]",
-        "uts": "uts:[4026532339]"
+        "ipc": "ipc:[4026532376]",
+        "mnt": "mnt:[4026532371]",
+        "net": "net:[4026532387]",
+        "pid": "pid:[4026532385]",
+        "user": "user:[4026532513]",
+        "uts": "uts:[4026532372]"
       },
       "status": "PASS"
     },
@@ -195,12 +195,12 @@
     },
     "orchestrator:namespace-separation": {
       "namespaces": {
-        "ipc": "ipc:[4026532399]",
-        "mnt": "mnt:[4026532339]",
-        "net": "net:[4026532472]",
-        "pid": "pid:[4026532468]",
-        "user": "user:[4026532464]",
-        "uts": "uts:[4026532345]"
+        "ipc": "ipc:[4026532443]",
+        "mnt": "mnt:[4026532372]",
+        "net": "net:[4026532515]",
+        "pid": "pid:[4026532512]",
+        "user": "user:[4026532605]",
+        "uts": "uts:[4026532386]"
       },
       "status": "PASS",
       "uid": 1000
@@ -297,12 +297,12 @@
     },
     "qa:namespace-separation": {
       "namespaces": {
-        "ipc": "ipc:[4026532473]",
-        "mnt": "mnt:[4026532345]",
-        "net": "net:[4026532477]",
-        "pid": "pid:[4026532474]",
-        "user": "user:[4026532472]",
-        "uts": "uts:[4026532351]"
+        "ipc": "ipc:[4026532443]",
+        "mnt": "mnt:[4026532386]",
+        "net": "net:[4026532519]",
+        "pid": "pid:[4026532517]",
+        "user": "user:[4026532614]",
+        "uts": "uts:[4026532393]"
       },
       "status": "PASS",
       "uid": 1000
@@ -403,12 +403,12 @@
     },
     "security:namespace-separation": {
       "namespaces": {
-        "ipc": "ipc:[4026532352]",
-        "mnt": "mnt:[4026532346]",
-        "net": "net:[4026532356]",
-        "pid": "pid:[4026532353]",
-        "user": "user:[4026532567]",
-        "uts": "uts:[4026532351]"
+        "ipc": "ipc:[4026532455]",
+        "mnt": "mnt:[4026532390]",
+        "net": "net:[4026532610]",
+        "pid": "pid:[4026532515]",
+        "user": "user:[4026532395]",
+        "uts": "uts:[4026532393]"
       },
       "status": "PASS",
       "uid": 1000

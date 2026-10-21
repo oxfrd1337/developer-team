@@ -34,9 +34,9 @@ gebucht und keine Container-/VM-Ressourcen angelegt.
 
 Die Messung der Hostgrenzen ist in
 [dt-006-boundary-report.json](dt-006-boundary-report.json) gespeichert, erhoben am
-`2026-10-21T21:31:49.425841+00:00`. Der Bericht enthält den SHA-256 der tatsächlich
+`2026-10-21T21:37:55.932321+00:00`. Der Bericht enthält den SHA-256 der tatsächlich
 ausgeführten `boundary_probe.py`:
-`9b063407143699b15f92a8228496d321d413eb4e7bd1b5ceb88c0b044109c413`.
+`fc38eb41ee8950df267d423184ea4409e16d0addfc3a6e73d8cc1bcc98819eb0`.
 Die Datei ist ein Beobachtungsartefakt, keine gespeicherte Startberechtigung.
 
 Die negativen Zugriffe wurden hier tatsächlich in getrennten User-, Mount-, PID-,
@@ -94,8 +94,8 @@ keine konfigurierten Credentials/Identitäten. Abhängigkeiten wurden deshalb ni
 aus dem Netz nachinstalliert; keine Proxy-, Auth- oder Policyumgehung.
 
 Der ursprüngliche PR-HEAD enthielt `[skip ci]` und hatte deshalb keine Pflicht-CI.
-Die Kostenprüfung dieser Revision ergab: Der GitHub-Connector bietet keine
-Billing-/Kontingentfunktion und unterstützt keine User-/Organisation-Billing-APIs;
+Die Kostenprüfung dieser Revision ergab: Der GitHub-Connector bietet keinen
+kontoweiten Billing-/Restkontingentzugriff und unterstützt keine User-/Organisation-Billing-APIs;
 direkte Abfragen aus dem Worker sind durch die Netzpolicy gesperrt. Weder Restminuten
 noch freier Artefaktspeicher konnten unabhängig abgelesen werden. Ein unbekanntes
 Kontingent wird nicht als kostenfreies Restbudget ausgegeben.
@@ -109,6 +109,14 @@ zusammen 45 konfigurierte Jobminuten. Das ist keine Garantie über tatsächliche
 Abrechnungsminuten oder gleichzeitigen Kontoverbrauch. Keine neuen Runnerklassen,
 Käufe, Zahlungsdaten, Budgets oder Billing-Einstellungen; bei einer von GitHub
 gemeldeten Kontingent-/Abrechnungssperre stoppen und diese dokumentieren.
+
+Lesbar waren anschließend die runbezogenen Timing-Endpunkte der Läufe
+[39679963318](https://github.com/oxfrd1337/developer-team/actions/runs/39679963318) und
+[39680188884](https://github.com/oxfrd1337/developer-team/actions/runs/39680188884).
+Beide API-Antworten melden `billable.UBUNTU.total_ms=0`, bei 28 bzw. 26 Sekunden
+Gesamtlaufzeit. Diese Läufe fanden Import-/Formatbefunde; sie sind keine grünen
+Prüfnachweise. Timingdaten ersetzen weder eine aktuelle Restkontingentabfrage
+noch eine Prüfung des verfügbaren Artefaktspeichers oder eine Kostengarantie.
 
 Die vollständige CI muss Python 3.11/3.12/3.13, Ruff inklusive Securityregeln,
 Format, vollständige Suite mit Branch-Coverage ≥80 %, Build und Smoke für denselben

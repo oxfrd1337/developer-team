@@ -113,9 +113,7 @@ def _namespaces() -> dict[str, str]:
 
 
 def _run(root: Path, source: str, request: dict) -> dict:
-    command = PilotCommandRunner.command(
-        root, ("python3", "-I", "-c", source, json.dumps(request))
-    )
+    command = PilotCommandRunner.command(root, ("python3", "-I", "-c", source, json.dumps(request)))
     result = subprocess.run(
         command,
         env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},

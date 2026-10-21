@@ -98,4 +98,3 @@ class SnapshotSeal:
         if _inventory(workspace) != self.inventory:
             raise TeamError("Snapshot content or Git metadata mutated; evidence invalidated")
         workspace.assert_clean(self.head_sha)
-

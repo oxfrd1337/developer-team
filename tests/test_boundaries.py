@@ -203,7 +203,8 @@ class BoundaryProbeTests(unittest.TestCase):
                     }
                     source = probe._CHILD.replace("/project", str(project))
                     source = source.replace(
-                        "/tmp/dt006-output", str(root / "output")  # noqa: S108 -- namespace marker
+                        "/tmp/dt006-output",  # noqa: S108 -- namespace marker
+                        str(root / "output"),
                     )
                     result = subprocess.run(
                         [sys.executable, "-I", "-c", source, json.dumps(request)],

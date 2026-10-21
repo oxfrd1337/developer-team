@@ -335,9 +335,7 @@ class RunStore:
                 raise TeamError("Exec verification does not match the simulated transport")
             record["controller_verification"] = verification
             payload = json.dumps(record, sort_keys=True)
-            connection.execute(
-                "UPDATE exec_calls SET payload = ? WHERE id = ?", (payload, job_id)
-            )
+            connection.execute("UPDATE exec_calls SET payload = ? WHERE id = ?", (payload, job_id))
             connection.execute(
                 "INSERT INTO events(run_id, kind, payload) "
                 "VALUES (?, 'exec:controller-verified', ?)",
