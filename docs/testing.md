@@ -107,3 +107,11 @@ Diese CI-Jobs bestätigen weder eine produktive Cloud-Ausführung noch isolierte
 KI-Reviews. Tatsächlich gelaufene lokale und entfernte Prüfungen werden separat in
 [handover.md](handover.md) dokumentiert. Ein CI-Lauf kann in einem privaten Repository
 an Actions-Freigabe, Budget oder Planvorgaben scheitern; das wird nicht als Testpass gewertet.
+
+## DT-005
+
+`python -m unittest tests.test_exec -v` prüft den Exec-Vertrag mit echten lokalen
+Python-Prozessen als ausdrücklich simulierten CLI-Antworten. Es wird kein Codex-
+oder Modellprozess gestartet. Budgets, Ressourcen-/Ausgabegrenzen, Abbruch,
+Ergebnisbindung, Reviewtrennung und Live-/Merge-Sperren sind in
+[dt-005.md](dt-005.md) beschrieben. Diese Tests attestieren keine OS-Isolation.

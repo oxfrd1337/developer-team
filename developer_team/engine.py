@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from .adapters.base import AgentBackend, AgentContext, DeliveryBackend
 from .adapters.cloud_agents import CodexCloudAgents
+from .adapters.exec_agents import CodexExecAgents
 from .authority import EvidenceAuthority, ProjectGrant, RuntimePolicy
 from .config import ProjectConfig
 from .execution import SyntheticCommandRunner
@@ -46,6 +47,7 @@ class Engine:
     ):
         policy = policy or RuntimePolicy()
         self.cloud_mode = isinstance(agents, CodexCloudAgents)
+        self.exec_mode = isinstance(agents, CodexExecAgents)
         if not self.cloud_mode and not (
             agents.simulated
             and delivery.simulated
@@ -65,6 +67,8 @@ class Engine:
         self.store, self.authority, self.grant, self.policy = store, authority, grant, policy
         self.runner = runner or SyntheticCommandRunner()
         self.documents, self.effective_digest = workspace.instructions(config)
+        if self.exec_mode:
+            agents.validate_session(config, self.effective_digest, store, grant, policy)
         if self.cloud_mode:
             agents.validate_session(config, self.effective_digest, store, grant, policy)
             if delivery.simulated:
@@ -378,7 +382,9 @@ class Engine:
                 kind=category.value,
                 issuer=self.agents.qa_identity if qa else self.agents.security_identity,
                 role=Role.QA if qa else Role.SECURITY,
-                origin=self.agents.review_origin if self.cloud_mode else Origin.SIMULATED,
+                origin=self.agents.review_origin
+                if self.cloud_mode or self.exec_mode
+                else Origin.SIMULATED,
                 outcome=review.outcome,
                 criteria=review.covered_criteria,
                 blockers=tuple(f.code for f in findings),
@@ -391,10 +397,12 @@ class Engine:
                     run,
                     kind="acceptance",
                     issuer=self.agents.orchestrator_identity
-                    if self.cloud_mode
+                    if self.cloud_mode or self.exec_mode
                     else "synthetic-orchestrator",
                     role=Role.ORCHESTRATOR,
-                    origin=self.agents.review_origin if self.cloud_mode else Origin.SIMULATED,
+                    origin=self.agents.review_origin
+                    if self.cloud_mode or self.exec_mode
+                    else Origin.SIMULATED,
                     outcome=Outcome.PASS,
                     criteria=review.covered_criteria,
                     artifact={"qa": run.evidence[-1].id, "plan": run.plan.digest},
@@ -441,9 +449,11 @@ class Engine:
                 qa=self.agents.qa_identity,
                 security=self.agents.security_identity,
             )
-            if not decision.allowed or self.cloud_mode:
+            if not decision.allowed or self.cloud_mode or self.exec_mode:
                 run.status = RunStatus.BLOCKED
                 run.reasons = list(decision.reasons)
+                if self.exec_mode:
+                    run.reasons.append("exec_simulation_requires_manual_release")
                 if self.cloud_mode:
                     run.reasons.append("cloud_pilot_requires_manual_merge")
                 run.suggestions = [

@@ -99,3 +99,10 @@ mit Testadaptern vorbereitet. Echte Cloud-Aufträge benötigen eine separate kon
 Freigabe; es gibt keine Live-Aktivierung und keinen automatischen Merge.
 [Betrieb, Kosten und Freigabeablauf](docs/dt-003.md) ·
 [Beobachtete Prüfungen](docs/dt-003-validation.md).
+
+## DT-005: Codex Exec
+
+Der optionale Exec-Adapter nutzt die bestehenden Engine-Stufen ausschließlich mit
+lokalen CLI-Simulatoren. Echte Aufrufe bleiben technisch gesperrt. Architektur,
+Sicherheitsanalyse und die NO-GO-Entscheidung für einen beaufsichtigten Pilot stehen
+in [docs/dt-005.md](docs/dt-005.md).
