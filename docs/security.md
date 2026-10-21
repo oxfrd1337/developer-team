@@ -1,5 +1,12 @@
 # Sicherheit und Berechtigungen
 
+DT-002 ergänzt ausschließlich einen explizit freizugebenden Cloud-Pilotpfad im
+bestehenden Controller. Die CLI hat weiterhin keinen Aktivierungsschalter. Der Pilot
+benötigt einen außerhalb des Projekts erteilten Laufgrant, eigene Rollen-Tasks und
+Ergebnisprüfung; sein Merge bleibt immer blockiert. Remote-Checkout und tatsächliche
+Rollenberechtigungen sind durch die CLI nicht attestiert. Grenzen und noch benötigte
+Rechte sind in [dt-002.md](dt-002.md) aufgeschlüsselt.
+
 Der Standard ist gesperrt: `safe_test_mode=True`, `first_release_approved=False`,
 `bootstrap=True` und projektspezifisch `merge.enabled=false`. Die Demo besitzt
 keine Merge-Berechtigung. Es gibt keine Deployment-Funktion und keinen Merge-Workflow.

@@ -1,5 +1,9 @@
 # Autonomer Ablauf im Testmodus
 
+Der folgende Ablauf beschreibt den weiterhin voreingestellten synthetischen Modus.
+DT-002 verwendet dieselben Stufen für separat freizugebende Cloud-Piloten; Taskfristen,
+Pause/Fortsetzung und mehrdeutige Übermittlungen sind in [dt-002.md](dt-002.md) beschrieben.
+
 1. **Anforderung:** Der Controller prüft Projektgrant, unveränderten Checkout,
    Richtlinien und den effektiven Konfigurationshash.
 2. **Analyse:** Der Orchestrator liefert eindeutige messbare Abnahmekriterien und Aufgaben.

@@ -40,10 +40,11 @@ class ProjectGrant:
 
 @dataclass
 class EvidenceAuthority:
-    """In-memory receipts for the trusted synthetic driver, not cloud attestations.
+    """Process-local output integrity receipts, not cloud execution attestations.
 
     Saved run JSON is audit data only. A fresh process must rerun checks/reviews.
-    Live evidence must come from a separately implemented trusted collector.
+    CODEX_CLOUD output remains unverified agent testimony. Live release evidence
+    must come from a separately implemented trusted collector.
     """
 
     issuers: dict[str, tuple[Role, frozenset[Origin]]]

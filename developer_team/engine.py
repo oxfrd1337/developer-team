@@ -1,17 +1,19 @@
-"""Durable bounded workflow. DT-001 exposes this driver only for synthetic projects."""
+"""Durable bounded workflow for synthetic demos and explicitly approved cloud pilots."""
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from uuid import uuid4
 
 from .adapters.base import AgentBackend, AgentContext, DeliveryBackend
+from .adapters.cloud_agents import CodexCloudAgents
 from .authority import EvidenceAuthority, ProjectGrant, RuntimePolicy
 from .config import ProjectConfig
 from .execution import SyntheticCommandRunner
 from .gate import MergeGate
 from .models import (
     Binding,
+    CloudPending,
     FailureClass,
     Finding,
     IntegrationUnavailable,
@@ -43,7 +45,8 @@ class Engine:
         runner: SyntheticCommandRunner | None = None,
     ):
         policy = policy or RuntimePolicy()
-        if not (
+        self.cloud_mode = isinstance(agents, CodexCloudAgents)
+        if not self.cloud_mode and not (
             agents.simulated
             and delivery.simulated
             and config.provider == "local"
@@ -62,6 +65,12 @@ class Engine:
         self.store, self.authority, self.grant, self.policy = store, authority, grant, policy
         self.runner = runner or SyntheticCommandRunner()
         self.documents, self.effective_digest = workspace.instructions(config)
+        if self.cloud_mode:
+            agents.validate_session(config, self.effective_digest, store, grant, policy)
+            if delivery.simulated:
+                raise IntegrationUnavailable(
+                    "Cloud runs require an explicitly manual delivery adapter"
+                )
         self.gate = MergeGate(authority)
 
     def execute(
@@ -69,10 +78,15 @@ class Engine:
     ) -> Run:
         if not requirement.strip() or len(requirement) > 100_000:
             raise TeamError("A bounded, nonempty requirement is required")
+        if self.cloud_mode:
+            if run_id is not None and run_id != self.agents.approval.run_id:
+                raise TeamError("Cloud resume belongs to a different approval")
+            if run_id is None and self.store.has_run(self.agents.approval.run_id):
+                run_id = self.agents.approval.run_id
         if run_id is None:
             self.workspace.assert_clean()
             run = Run(
-                str(uuid4()),
+                self.agents.approval.run_id if self.cloud_mode else str(uuid4()),
                 self.config.repository,
                 self.effective_digest,
                 digest(requirement),
@@ -83,12 +97,20 @@ class Engine:
         else:
             run = self.store.load(run_id)
         with self.store.lock(run.id):
+            if self.cloud_mode and run_id is None and self.store.has_run(run.id):
+                run_id = run.id
             if run_id is not None:
                 # Reload AFTER acquiring the lock; never act on a stale pre-lock snapshot.
                 run = self.store.load(run.id)
                 if run.status not in (RunStatus.PAUSED, RunStatus.RUNNING):
                     return run
-                if run.in_flight:
+                recoverable_cloud_step = self.cloud_mode and run.in_flight in (
+                    Stage.ANALYSIS.value,
+                    Stage.DEVELOPMENT.value,
+                    Stage.QA.value,
+                    Stage.SECURITY.value,
+                )
+                if run.in_flight and not recoverable_cloud_step:
                     return self._stop(
                         run,
                         RunStatus.INTERRUPTED,
@@ -110,8 +132,17 @@ class Engine:
                         "a newly authorized run.",
                     )
                 # JSON journal entries are not trusted proofs after a process restart.
-                run.evidence = []
-                if run.stage in (Stage.QA, Stage.SECURITY, Stage.PULL_REQUEST, Stage.RELEASE):
+                retain_receipts = self.cloud_mode and all(
+                    self.authority.verify(record) for record in run.evidence
+                )
+                if not retain_receipts:
+                    run.evidence = []
+                if not retain_receipts and run.stage in (
+                    Stage.QA,
+                    Stage.SECURITY,
+                    Stage.PULL_REQUEST,
+                    Stage.RELEASE,
+                ):
                     run.stage = Stage.TESTS
             run.status = RunStatus.RUNNING
             self.store.save(run, "start_or_resume")
@@ -141,13 +172,40 @@ class Engine:
                     run.steps += 1
                     run.in_flight = run.stage.value
                     self.store.save(run, "action_intent")
-                    self._step(run, context)
+                    self._step(
+                        run,
+                        replace(
+                            context,
+                            run_id=run.id,
+                            cycle=sum(run.repairs.values()),
+                            base_sha=run.base_sha,
+                            checks=tuple(
+                                (e.kind, e.outcome.value)
+                                for e in run.evidence
+                                if e.kind.startswith("check:")
+                            ),
+                        ),
+                    )
                     run.in_flight = None
                     self.store.save(run, "action_completed")
+            except CloudPending as exc:
+                # Polls have their own durable limits; waiting does not consume repair/step budget.
+                run.steps -= 1
+                run.in_flight = None
+                run.status = RunStatus.PAUSED
+                self.store.save(run, "cloud_wait:" + str(exc))
             except KeyboardInterrupt:
+                tasks = self.store.cloud_tasks(run.id) if self.cloud_mode else []
+                known_cloud_task = (
+                    bool(tasks)
+                    and bool(tasks[-1].get("task_id"))
+                    and tasks[-1]["state"] in ("pending", "ready")
+                )
+                if known_cloud_task:
+                    run.in_flight = None
                 self._stop(
                     run,
-                    RunStatus.INTERRUPTED,
+                    RunStatus.PAUSED if known_cloud_task else RunStatus.INTERRUPTED,
                     "Execution interrupted",
                     "Inspect the action intent and reconcile partial changes before rerun.",
                 )
@@ -249,7 +307,7 @@ class Engine:
             self.grant.require(self.config, "develop", self.effective_digest)
             self.workspace.assert_clean(run.head_sha)
             self.agents.develop(context, run.plan, run.architecture, tuple(run.findings))
-            run.head_sha = self.workspace.commit(f"Implement synthetic requirement ({run.id})")
+            run.head_sha = self.workspace.commit(f"Implement requirement ({run.id})")
             run.evidence = []
             run.findings = []
             run.stage = Stage.TESTS
@@ -320,7 +378,7 @@ class Engine:
                 kind=category.value,
                 issuer=self.agents.qa_identity if qa else self.agents.security_identity,
                 role=Role.QA if qa else Role.SECURITY,
-                origin=Origin.SIMULATED,
+                origin=self.agents.review_origin if self.cloud_mode else Origin.SIMULATED,
                 outcome=review.outcome,
                 criteria=review.covered_criteria,
                 blockers=tuple(f.code for f in findings),
@@ -332,9 +390,11 @@ class Engine:
                 self._evidence(
                     run,
                     kind="acceptance",
-                    issuer="synthetic-orchestrator",
+                    issuer=self.agents.orchestrator_identity
+                    if self.cloud_mode
+                    else "synthetic-orchestrator",
                     role=Role.ORCHESTRATOR,
-                    origin=Origin.SIMULATED,
+                    origin=self.agents.review_origin if self.cloud_mode else Origin.SIMULATED,
                     outcome=Outcome.PASS,
                     criteria=review.covered_criteria,
                     artifact={"qa": run.evidence[-1].id, "plan": run.plan.digest},
@@ -349,11 +409,11 @@ class Engine:
                 run.id,
                 run.head_sha,
                 run.base_sha,
-                f"DT-001 synthetic run {run.id}. Agent actions are SIMULATED. "
-                "Includes implementation, tests and documentation; no cloud attestation.",
+                f"Developer team run {run.id}; simulated={self.agents.simulated}. "
+                "Includes implementation, tests and documentation; no checkout attestation.",
             )
             if (
-                not run.pr.simulated
+                run.pr.simulated != self.delivery.simulated
                 or run.pr.repository != run.repository
                 or run.pr.head_sha != run.head_sha
                 or run.pr.base_sha != run.base_sha
@@ -381,9 +441,11 @@ class Engine:
                 qa=self.agents.qa_identity,
                 security=self.agents.security_identity,
             )
-            if not decision.allowed:
+            if not decision.allowed or self.cloud_mode:
                 run.status = RunStatus.BLOCKED
                 run.reasons = list(decision.reasons)
+                if self.cloud_mode:
+                    run.reasons.append("cloud_pilot_requires_manual_merge")
                 run.suggestions = [
                     "Inspect each blocking reason. Keep DT-001 in test mode; first review and "
                     "merge the bootstrap PR manually. Authorize each later project separately.",

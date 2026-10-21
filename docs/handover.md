@@ -1,5 +1,9 @@
 # DT-001 · Übergabe
 
+Historischer DT-001-Stand. Die aktuelle Erweiterung, erfolgreich geprüfte Funktionen,
+fehlenden Rechte und Voraussetzungen des ersten echten Cloud-Tests stehen in
+[DT-002 · Cloud-Integration](dt-002.md). Der DT-002-PR aktiviert keinen Produktivbetrieb.
+
 Stand: 20. Oktober 2026. Der Einrichtungs-PR ist für eine manuelle Prüfung vorgesehen.
 Er wird nicht automatisch gemergt. Das System bleibt ohne ausdrückliche Erstfreigabe
 im sicheren Testmodus. Es wurde kein externes Projekt angebunden oder verändert.

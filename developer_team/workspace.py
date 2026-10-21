@@ -25,7 +25,7 @@ class GitWorkspace:
         if not (self.root / ".git").is_dir():
             raise TeamError("Workspace must be a dedicated Git checkout")
 
-    def git(self, *args: str) -> str:
+    def git(self, *args: str, strip: bool = True) -> str:
         try:
             result = subprocess.run(
                 ["git", "-c", "core.hooksPath=/dev/null", *args],
@@ -38,7 +38,7 @@ class GitWorkspace:
             )
         except (OSError, subprocess.SubprocessError) as exc:
             raise TeamError(f"Git operation failed: {type(exc).__name__}") from exc
-        return result.stdout.strip()
+        return result.stdout.strip() if strip else result.stdout
 
     @property
     def head(self) -> str:

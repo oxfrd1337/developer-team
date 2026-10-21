@@ -1,7 +1,9 @@
 # Schnittstellen, Kosten und technische Einschränkungen
 
-Prüfstand: 20. Oktober 2026. Geprüft wurden Repository-Metadaten, tatsächliche
+Prüfstand DT-001: 20. Oktober 2026. Geprüft wurden Repository-Metadaten, tatsächliche
 lokale CLI-Hilfe und offizielle Dokumentation, bevor die Adapter implementiert wurden.
+DT-002 vom 21. Oktober erweitert diesen Stand um die unten beschriebenen Implementierungen.
+Die aktuelle Abgrenzung und Pilotvoraussetzungen stehen in [dt-002.md](dt-002.md).
 
 ## Tatsächlich geprüft
 
@@ -15,8 +17,9 @@ lokale CLI-Hilfe und offizielle Dokumentation, bevor die Adapter implementiert w
 | GitHub REST | PR-Erstellung, Check-Runs, Branch Protection und SHA-gebundener Merge dokumentiert | Adapterverträge sind mit nachgebildeten Antworten getestet; Live-Merge nicht ausgeführt |
 
 Der Probe-Befehl wiederholt ausschließlich Versions-, Hilfe- und Anmeldestatusprüfung.
-Der Gateway baut echte CLI-Aufrufe mit einem Versuch auf und verweigert sie im
-Testmodus. Ein unbekanntes Receipt-Format ist ein unklarer Submit-Ausgang und löst
+Der Gateway baut echte CLI-Aufrufe mit einem Versuch auf und verweigert sie ohne
+separate laufgebundene Freigabe oder im Testmodus. Ein unbekanntes Receipt-Format
+ist ein unklarer Submit-Ausgang und löst
 keine automatische Wiederholung aus. Ein Receipt enthält `verified_execution=False`;
 es ist weder ein abgeschlossener Task noch ein Review-Beleg.
 
@@ -35,10 +38,15 @@ Offizielle Referenzen:
 - [GitHub: geschützte Branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches): Schutzregeln und Herkunft von Pflichtchecks.
 - [GitHub: Pflichtchecks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks): Belege müssen zum aktuellen Commit gehören.
 
-## Noch fehlende produktive Integrationen
+## DT-002 und verbleibende produktive Integrationen
 
-- Isolierte Cloud-Rollenläufe samt Task-Lifecycle, Timeouts und kontrolliertem Recovery.
-- Sicherer Ergebnis-/Diff-Import mit exaktem Commitbezug und tatsächlichem Testlauf.
+Task-Lifecycle, Rollenaufträge, Commitrefs, Zeit-/Auftragsbudgets und kontrollierter
+Diff-Import sind jetzt im bestehenden Adapter/Treiber implementiert und mit nachgebildeten
+Cloud-Antworten sowie echten lokalen Git-/Testprozessen geprüft. Ein realer Rollenlauf
+wurde nicht gestartet. Weiterhin fehlen:
+
+- Nachweis des ersten ausdrücklich freigegebenen synthetischen Cloud-Piloten.
+- Attestierung des tatsächlich ausgecheckten Remote-Commits und durchgesetzte Rollenisolierung.
 - Vertrauenswürdige getrennte QA-/Security-Attestierungen und vollständige Kriteriennachweise.
 - Prüfung der tatsächlichen Laufidentität und freigegebenen Controller-/Workflow-Version;
   Check-Name und gemeinsame Actions-App-ID reichen nicht.
@@ -46,8 +54,9 @@ Offizielle Referenzen:
 - Verifizierte Regeln für zusätzliche GitHub-Pläne, Rulesets, Merge Queues und Enterprise-Hosts.
 
 Die letzten Punkte sind Sperrgründe. Sie werden nicht durch ein `enabled=true`
-oder eine angenommene Anmeldung ersetzt. Der lokale Engine-Treiber unterstützt
-derzeit ausschließlich simulierte Agenten und simulierte Delivery bei aktivem Testmodus.
+oder eine angenommene Anmeldung ersetzt. Der normale CLI-Treiber bleibt synthetisch.
+Der Cloud-Pilotpfad erfordert eine separate Betreiberfreigabe und endet unabhängig
+von Agentenergebnissen ohne Merge.
 
 ## Kosten
 
@@ -67,8 +76,11 @@ hier wird kein Kostenplan gebucht und kein fester Preis versprochen.
 Ein normaler synthetischer Lauf benötigt vier logische Agentenaufrufe nach der
 Planungsbündelung. Korrekturen führen zu erneuter Entwicklung und erneuten Prüfungen;
 die realen Cloud-Kosten hängen von Kontextgröße, Laufzeit und Wiederholungen ab.
-Budgets begrenzen die Zahl der Korrekturen und Schritte. Ein späterer produktiver
-Treiber benötigt zusätzlich ein explizites Zeit-/Kostenlimit und begrenzte Statusabfragen.
+Budgets begrenzen Korrekturen, Schritte, Cloud-Aufträge, Gesamtlaufzeit, Taskfristen,
+Statusabfragen und Lesefehler. Die beobachtete CLI bietet kein monetäres Kostenlimit
+und keinen Fernabbruch. Der Betreiber muss Kontingent/Ausgaben daher zusätzlich im
+Anbieterkonto begrenzen und einen über die Controllerfrist hinaus laufenden Task
+gegebenenfalls manuell beenden. Ein Auftragslimit ist keine Geldbudgetgarantie.
 
 ## Laufzeitgrenzen
 

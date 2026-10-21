@@ -3,7 +3,9 @@
 Der Kern ist projektunabhängig: Er verarbeitet Anforderungen, versionierte
 Projektregeln und typisierte Adapterergebnisse. Python übernimmt die Steuerung;
 die Zielsoftware kann eine andere Sprache und Architektur verwenden. Der mitgelieferte
-Agentenadapter kennt absichtlich nur ein synthetisches Python-Beispiel.
+synthetische Agentenadapter kennt ein Python-Beispiel; `CodexCloudAgents` übermittelt
+freie Anforderungen über denselben `AgentBackend`-Vertrag. Es gibt weiterhin genau
+einen Zustandsautomaten, dieselben Korrekturschleifen und dasselbe Merge-Gate.
 
 ```mermaid
 flowchart TD
@@ -58,10 +60,15 @@ Prüfergebnisse begrenzen; Entwickler-Selbsteinschätzungen sind keine Review-Be
 | `adapters/synthetic.py` | Deterministischer Testtreiber, unabhängige QA-Probe, simulierte PRs |
 | `adapters/github.py` | Echte REST-Aufrufe über `gh`; getrennte Leser-, PR- und Merge-Objekte |
 | `adapters/codex_cloud.py` | Experimenteller CLI-Gateway ohne erfundene Cloud-HTTP-Endpunkte |
+| `adapters/cloud_agents.py` | Cloud-Aufträge für die vorhandenen Rollenstufen; manuelle Übergabe ohne Merger |
+| `adapters/cloud_contracts.py`, `adapters/cloud_results.py` | Laufgebundene Freigabe, striktes Ergebnisschema und isolierter Diff-Import |
 | `cli.py` | Ausschließlich Demo, Konfigurationsprüfung, lokale Anzeige und CLI-Probe |
 
 `AgentBackend` und `DeliveryBackend` erlauben andere Entwicklungsdienste oder
-Plattformen. Der DT-001-Treiber verweigert derzeit die Verkabelung eines Live-Adapters.
-Vor einer Freigabe müssen die Isolation, Ergebnisnormalisierung und Herkunftsprüfung
-zusammen mit dem neuen Adapter getestet werden. Die Verträge allein bestätigen
-keine produktive Cloud-Integration.
+Plattformen. DT-002 ergänzt im vorhandenen Treiber einen ausdrücklich freizugebenden
+Cloud-Pilotpfad. `CloudPending` pausiert die aktuelle Stufe; dieselbe Job-ID wird später
+weiter abgefragt. SQLite hält Auftrags-, Poll-, Zeit- und Korrekturbudgets über Neustarts.
+Die Standard-CLI bleibt im sicheren Testmodus. Der Pilot endet immer am Merge-Gate
+mit einer lokalen Übergabevorschau; echte PR-Erstellung und Merger sind nicht angeschlossen.
+Ergebnisbindung und getrennte Tasks bestätigen noch keine attestierte Cloud-Laufzeit.
+Vertrag, Grenzen und Freigabebedarf stehen in [dt-002.md](dt-002.md).

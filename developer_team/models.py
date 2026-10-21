@@ -34,6 +34,7 @@ class Origin(str, Enum):
     SIMULATED = "simulated"
     LOCAL_EXECUTION = "local_execution"
     GITHUB = "github"
+    CODEX_CLOUD = "codex_cloud"  # Task-bound agent output, not an execution attestation.
 
 
 class Outcome(str, Enum):
@@ -208,3 +209,7 @@ class PermissionDenied(TeamError):
 
 class IntegrationUnavailable(TeamError):
     pass
+
+
+class CloudPending(TeamError):
+    """A known task needs another bounded, read-only poll; never resubmit it."""

@@ -1,4 +1,4 @@
-# Universelles KI-Entwicklerteam · DT-001
+# Universelles KI-Entwicklerteam · DT-001 / DT-002
 
 Modularer Python-Kern für Anforderung, Planung, Architektur, Entwicklung, Tests,
 unabhängigen QA- und Security-Review, Korrekturen und kontrollierte PR-Freigabe.
@@ -37,21 +37,25 @@ python -m developer_team probe-codex
 `stale-evidence` demonstriert eine blockierte Freigabe. `probe-codex` prüft nur die
 installierte CLI und Anmeldung; es startet keinen Cloud-Auftrag. Die Demo ist ein
 deterministischer Testtreiber für die festgelegte Beispielanforderung. Freie produktive
-Anforderungen benötigen den noch zu vervollständigenden Cloud-Agentenadapter.
+Anforderungen unterstützt der neue, ausdrücklich freizugebende Cloud-Pilotadapter
+im bestehenden Zustandsautomaten. Die CLI aktiviert ihn nicht. Ein echter Cloud-
+Ende-zu-Ende-Lauf wurde nicht gestartet; [DT-002](docs/dt-002.md) trennt Implementierung,
+Testadapter, Berechtigungen und verbleibende Herkunftsgrenzen.
 
 ## Stand der Funktionen
 
 | Komponente | Tatsächlich implementiert / Grenze |
 | --- | --- |
 | Ablaufsteuerung | Zustandsautomat, SQLite-Journal, Prozesssperre, Pause/Fortsetzung, kontrollierter Abbruch |
-| Fünf Rollen | Austauschbarer Agentenvertrag; deterministische synthetische Implementierung |
+| Fünf Rollen | Synthetischer Adapter und Cloud-Backend; gebündelte Planung, eigene Entwicklungs-/QA-/Security-Tasks |
 | Entwicklung und Tests | Echte temporäre Git-Commits und Test-/Build-Prozesse; separater QA-Randfalltest |
 | Korrekturen | Höchstens drei Korrekturen pro fest definierter Fehlerklasse und höchstens 100 Schritte |
 | Projektanbindung | Striktes TOML v1, sprachunabhängige Befehle, AGENTS.md, Richtlinien und getrennte Grants |
 | Merge-Prüfung | Commit-, Basis-, Konfigurations-, Plan- und Laufbindung; unbekannt/fehlend blockiert |
 | GitHub | REST-Adapter über vorhandene `gh`-Anmeldung; SHA-Prüfung, Check-App-Bindung, Pagination, PR-Idempotenz |
-| Codex Cloud | Beobachtete experimentelle CLI für Submit/Status/Diff; Probe ausführbar; Remote-Lauf nicht nachgewiesen |
-| Live-Betrieb | Gesperrt: isolierte Ergebnisse und vertrauenswürdige Review-Attestierungen fehlen |
+| Codex Cloud | Reale CLI-Aufrufe für Submit/Status/List/Diff, dauerhaftes Taskjournal, Commitrefs, Ergebnisimport und begrenzte Wiederaufnahme; mit Testadapter geprüft |
+| Cloud-Pilot | Nur mit separater laufgebundener Betreiberfreigabe; keine automatische Aktivierung, PR-Erstellung oder Merges |
+| Produktivbetrieb | Gesperrt: Remote-Ende-zu-Ende-Prüfung, attestierter Checkout und durchgesetzte Rollenisolierung fehlen |
 | CI | GitHub Actions für synthetische Tests, Lint/Sicherheitsregeln und Paketbau; keine Merge-/Deploy-Rechte |
 
 Der Einrichtungs-PR wird manuell geprüft und gemergt. Das Mergen dieses PRs aktiviert
@@ -61,6 +65,7 @@ grüne Checks dieses Repositories sind keine unabhängigen Cloud-Review-Nachweis
 ## Dokumentation
 
 - [Architektur und fünf Rollen](docs/architecture.md)
+- [DT-002: Cloud-Integration, Testnachweise und erster Pilot](docs/dt-002.md)
 - [Versionierte Projektkonfiguration](docs/configuration.md)
 - [Ablauf, Korrekturen und Wiederaufnahme](docs/workflow.md)
 - [Sicherheit und Berechtigungen](docs/security.md)

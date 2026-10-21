@@ -75,7 +75,11 @@ def main(argv: list[str] | None = None) -> int:
             store = RunStore(args.state)
             print(
                 json.dumps(
-                    {"run": asdict(store.load(args.run_id)), "events": store.events(args.run_id)},
+                    {
+                        "run": asdict(store.load(args.run_id)),
+                        "events": store.events(args.run_id),
+                        "cloud_tasks": store.cloud_tasks(args.run_id),
+                    },
                     indent=2,
                 )
             )
