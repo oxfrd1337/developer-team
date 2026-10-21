@@ -6,6 +6,12 @@ Repositories. Adaptertests verwenden ausdrücklich nachgebildete CLI-/REST-Antwo
 Eine positive simulierte Merge-Entscheidung erhöht lediglich einen lokalen Zähler;
 sie führt weder `git merge` noch einen API-Aufruf aus.
 
+DT-002 ergänzt `tests/test_cloud.py` mit kontrollierten CLI-/Ref-Testadaptern,
+echten temporären Git-Importen und lokalen Testprozessen. Lifecycle, Reviewtrennung,
+Wiederaufnahme mit neuem Controller, Korrekturen und Merge-Sperre sowie die Grenzen
+der Testaussagen sind in [dt-002.md](dt-002.md) dokumentiert. Auch diese Tests starten
+keine echten Cloud-Tasks und benötigen keine Freigabe mit Kosten-/Schreibwirkung.
+
 ```sh
 python -m unittest discover -s tests -t . -v
 .venv/bin/python -m coverage run --branch -m unittest discover -s tests -t . -v

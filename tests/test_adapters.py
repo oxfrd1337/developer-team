@@ -321,6 +321,17 @@ class GitHubAdapterTests(unittest.TestCase):
 
 class CodexCloudAdapterTests(unittest.TestCase):
     def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from uuid import uuid4
+
+        from developer_team.adapters.cloud_contracts import CloudApproval, CloudJob
+        from developer_team.models import digest
+        from developer_team.store import RunStore
+        from tests.cloud_support import FakeRefs
+
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
         self.config = replace(load_config(EXAMPLE), provider="github")
         self.policy = RuntimePolicy(False, True, False)
         environments = tuple((role, f"env-{role.value}") for role in Role)
@@ -334,7 +345,28 @@ class CodexCloudAdapterTests(unittest.TestCase):
             environments,
         )
         self.runner = Mock(return_value="https://chatgpt.com/codex/tasks/task_fixture")
-        self.gateway = CodexCloudGateway(self.runner)
+        self.approval = CloudApproval(
+            str(uuid4()),
+            self.config.repository,
+            self.config.digest,
+            "explicit-test-operator",
+            10000,
+        )
+        self.job = CloudJob(
+            self.approval.run_id,
+            self.config.repository,
+            self.config.digest,
+            HEAD,
+            Role.DEVELOPER,
+            0,
+            digest("controlled input"),
+        )
+        self.gateway = CodexCloudGateway(
+            self.runner,
+            store=RunStore(Path(directory.name) / "state.sqlite3"),
+            refs=FakeRefs(),
+            now=lambda: 1,
+        )
 
     def submit(self, **changes):
         kwargs = dict(
@@ -343,9 +375,11 @@ class CodexCloudAdapterTests(unittest.TestCase):
             policy=self.policy,
             grant=self.grant,
             role=Role.DEVELOPER,
-            branch="dt/example",
+            branch=self.job.branch,
             expected_sha=HEAD,
             prompt="Synthetic requirement",
+            approval=self.approval,
+            job=self.job,
         )
         return self.gateway.submit(**(kwargs | changes))
 

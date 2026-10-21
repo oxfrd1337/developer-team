@@ -26,6 +26,9 @@ from ..models import (
     PlatformSnapshot,
     TeamError,
 )
+from ..workspace import GitWorkspace
+from .cloud_contracts import CloudJob
+from .codex_cloud import CliRunner, run_cli
 
 
 class GitHubTransport(Protocol):
@@ -300,3 +303,68 @@ class GitHubMerger:
         if result.get("merged") is not True:
             raise TeamError("GitHub did not confirm a merge; reconcile before retry")
         return result
+
+
+class GitHubCloudRefs:
+    """Create only new task refs in the one granted repository; no force updates.
+
+    Git's empty lease makes creation atomic, even if another actor creates the ref
+    between the read and push. The controller needs ordinary scoped contents write.
+    """
+
+    def __init__(
+        self,
+        config: ProjectConfig,
+        transport: GitHubTransport,
+        workspace: GitWorkspace,
+        grant: ProjectGrant,
+        effective_digest: str,
+        runner: CliRunner = run_cli,
+    ):
+        self.config, self.transport, self.workspace = config, transport, workspace
+        self.grant, self.effective_digest, self.runner = grant, effective_digest, runner
+
+    def _matches(self, job: CloudJob) -> list:
+        job.validate()
+        if job.repository != self.config.repository or job.config_digest != self.effective_digest:
+            raise PermissionDenied("Cloud ref belongs to a different repository or configuration")
+        self.grant.require(self.config, "read", self.effective_digest)
+        path = (
+            f"repos/{self.config.repository}/git/matching-refs/heads/{quote(job.branch, safe='/')}"
+        )
+        rows = self.transport.request("GET", path)
+        if not isinstance(rows, list):
+            raise TeamError("Unknown remote task ref state")
+        return [row for row in rows if row.get("ref") == "refs/heads/" + job.branch]
+
+    def verify(self, job: CloudJob) -> None:
+        matches = self._matches(job)
+        if (
+            len(matches) != 1
+            or matches[0].get("object", {}).get("type") != "commit"
+            or matches[0]["object"].get("sha") != job.head_sha
+        ):
+            raise TeamError("Missing, stale or conflicting immutable cloud task ref")
+
+    def prepare(self, job: CloudJob) -> None:
+        self.grant.require(self.config, "cloud_publish", self.effective_digest)
+        self.workspace.assert_clean(job.head_sha)
+        if self._matches(job):
+            self.verify(job)
+            return
+        ref = "refs/heads/" + job.branch
+        self.runner(
+            [
+                "git",
+                "-C",
+                str(self.workspace.root),
+                "-c",
+                "core.hooksPath=/dev/null",
+                "push",
+                "--porcelain",
+                f"--force-with-lease={ref}:",
+                f"https://github.com/{self.config.repository}.git",
+                f"{job.head_sha}:{ref}",
+            ]
+        )
+        self.verify(job)

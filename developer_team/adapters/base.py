@@ -14,6 +14,10 @@ class AgentContext:
     config: ProjectConfig
     instructions: dict[str, str]
     workspace: GitWorkspace
+    run_id: str = ""
+    cycle: int = 0
+    base_sha: str = ""
+    checks: tuple[tuple[str, str], ...] = ()
 
 
 class AgentBackend(Protocol):
