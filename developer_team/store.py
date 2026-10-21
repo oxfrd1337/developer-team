@@ -30,7 +30,6 @@ from .models import (
     TeamError,
 )
 
-
 _EXEC_VERIFICATION_DIGESTS = {
     "head_sha": 40,
     "tree_sha": 40,
