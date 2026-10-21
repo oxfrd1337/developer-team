@@ -1,5 +1,14 @@
 # Teststrategie
 
+DT-004 ergänzt `tests/test_supervised_pilot.py`: lokale Vorbereitung ohne Cloud,
+feste Dateigrenzen, vier Umgebungen, unveränderliche Grants/Budgets, verlorenes Journal,
+gesperrte Anmeldung/Sandbox, Ergebnis-/Status-/Testbelege sowie echte Python-Fehler
+und Korrekturen mit ausdrücklich simulierten Agentenantworten. Der optionale echte
+Namespace-Test prüft Datei-/Credential-/Schreib-/Netzgrenzen. Ist die Hostfunktion
+gesperrt, wird er als **Skip** ausgewiesen und bleibt ein Live-Blocker; die
+Betreiberfunktion verweigert dann jede Cloud-Übermittlung. Diese Provider-Testadapter
+belegen keine KI-Leistung. Details: [DT-004](dt-004.md).
+
 Die Tests benötigen keine GitHub-/OpenAI-Credentials und rufen keine externen
 Projekt-APIs auf. Git und Python-Prozesse arbeiten nur in temporären synthetischen
 Repositories. Adaptertests verwenden ausdrücklich nachgebildete CLI-/REST-Antworten.

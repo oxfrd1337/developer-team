@@ -1,5 +1,11 @@
 # DT-001 · Übergabe
 
+Aktueller DT-004-Stand: Vorbereitung des echten beaufsichtigten Piloten auf Basis
+von DT-001 bis DT-003; noch kein Live-Auftrag. Technischer Stand, Zugangsprüfung,
+Blocker und Abnahmekriterien: [dt-004.md](dt-004.md). Konkrete separate Freigabe
+und Betreiberanleitung: [dt-004-approval.md](dt-004-approval.md). Der Actions-Workflow
+bleibt ausschließlich eine Simulation; kein automatischer Merge/Deployment.
+
 Historischer DT-001-Stand. Die aktuelle Erweiterung, erfolgreich geprüfte Funktionen,
 fehlenden Rechte und Voraussetzungen des ersten echten Cloud-Tests stehen in
 [DT-002 · Cloud-Integration](dt-002.md). Der DT-002-PR aktiviert keinen Produktivbetrieb.

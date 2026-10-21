@@ -25,6 +25,7 @@ from .models import RunStatus, TeamError
 from .pilot import SCENARIOS as PILOT_SCENARIOS
 from .pilot import prepare_session, step_rehearsal
 from .store import RunStore
+from .supervised_pilot import prepare_supervised
 
 
 def parser() -> argparse.ArgumentParser:
@@ -77,6 +78,11 @@ def parser() -> argparse.ArgumentParser:
     provenance.add_argument("--sha", required=True)
     provenance.add_argument("--source-run", required=True)
     provenance.add_argument("--artifact-id", required=True)
+    supervised = commands.add_parser(
+        "pilot-plan", help="Prepare a supervised pilot locally; no login, remote writes or approval"
+    )
+    supervised.add_argument("--source", type=Path, default=Path(__file__).resolve().parents[1])
+    supervised.add_argument("--output", type=Path, required=True)
     return result
 
 
@@ -99,6 +105,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "probe-codex":
             print(json.dumps(CodexCloudGateway().probe(), indent=2))
+            return 0
+        if args.command == "pilot-plan":
+            print(json.dumps(prepare_supervised(args.source, args.output), indent=2))
             return 0
         if args.command == "pilot-check-source":
             check_artifact_source(

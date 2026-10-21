@@ -6,7 +6,9 @@ import json
 import math
 import os
 import re
+import sqlite3
 import time
+from contextlib import closing
 from dataclasses import replace
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -20,10 +22,10 @@ from .authority import ProjectGrant, RuntimePolicy
 from .config import load_config
 from .engine import Engine
 from .models import Origin, Role, RunStatus, TeamError
+from .pilot_scope import PILOT_REPOSITORY
 from .store import RunStore
 from .workspace import GitWorkspace
 
-PILOT_REPOSITORY = "oxfrd1337/developer-team"
 SCENARIOS = ("happy", "test-fix", "qa-fix", "repair-limit")
 SESSION_FIELDS = {
     "schema_version",
@@ -61,6 +63,11 @@ def write_json(path: Path, value: dict) -> None:
         stream.flush()
         os.fsync(stream.fileno())
     temporary.replace(path)
+    descriptor = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def read_session(root: Path) -> dict:
@@ -105,6 +112,26 @@ def session_store(root: Path) -> RunStore:
     path = root / "state.sqlite3"
     if path.is_symlink() or not path.is_file() or path.stat().st_size == 0:
         raise TeamError("Pilot journal is missing; never start fresh under an existing run ID")
+    # Read-only validation precedes RunStore's schema initialization. An unrelated
+    # SQLite file must not silently become a fresh journal under a live session.
+    try:
+        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
+            schema = connection.execute("SELECT type, name FROM sqlite_master").fetchall()
+            if (
+                connection.execute("PRAGMA quick_check").fetchall() != [("ok",)]
+                or {name for kind, name in schema if kind == "table"}
+                != {
+                    "runs",
+                    "events",
+                    "cloud_tasks",
+                    "cloud_limits",
+                    "sqlite_sequence",
+                }
+                or any(kind not in ("table", "index") for kind, _ in schema)
+            ):
+                raise TeamError("Pilot journal schema or integrity is invalid; reconcile manually")
+    except sqlite3.Error as exc:
+        raise TeamError("Pilot journal is unreadable; never recreate it automatically") from exc
     return RunStore(path)
 
 

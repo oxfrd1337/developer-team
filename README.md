@@ -64,6 +64,8 @@ grüne Checks dieses Repositories sind keine unabhängigen Cloud-Review-Nachweis
 
 ## Dokumentation
 
+- [DT-004: Echter Pilot, Zugangsprüfung und offene Voraussetzungen](docs/dt-004.md)
+- [Konkrete Live-Freigabevorlage und Betreiberanleitung](docs/dt-004-approval.md)
 - [Architektur und fünf Rollen](docs/architecture.md)
 - [DT-002: Cloud-Integration, Testnachweise und erster Pilot](docs/dt-002.md)
 - [Versionierte Projektkonfiguration](docs/configuration.md)

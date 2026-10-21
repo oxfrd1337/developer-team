@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import asdict
+from pathlib import Path
 
 from ..authority import EvidenceAuthority, ProjectGrant, RuntimePolicy
 from ..models import (
@@ -69,6 +70,9 @@ class CodexCloudAgents:
         approval: CloudApproval,
         grant: ProjectGrant,
         policy: RuntimePolicy,
+        *,
+        allowed_paths: tuple[str, ...] | None = None,
+        audit_directory: Path | None = None,
     ):
         self.gateway, self.approval, self.grant, self.policy = gateway, approval, grant, policy
         environments = dict(grant.cloud_environments)
@@ -76,7 +80,11 @@ class CodexCloudAgents:
         self.developer_identity = f"codex-cloud:{environments.get(Role.DEVELOPER, '')}"
         self.qa_identity = f"codex-cloud:{environments.get(Role.QA, '')}"
         self.security_identity = f"codex-cloud:{environments.get(Role.SECURITY, '')}"
-        self.importer = CloudResultImporter()
+        self.importer = CloudResultImporter(
+            allowed_paths=allowed_paths,
+            audit_directory=audit_directory,
+            simulated=gateway.simulated,
+        )
 
     def validate_session(self, config, effective_digest, store, grant, policy) -> None:
         self.approval.validate(
@@ -121,6 +129,14 @@ class CodexCloudAgents:
             "base_sha": context.base_sha,
             **inputs,
         }
+        if self.importer.allowed_paths is not None:
+            inputs["allowed_source_paths"] = self.importer.allowed_paths
+            schema += (
+                "\nThe controller permits developer source edits ONLY in allowed_source_paths. "
+                "Planning and reviewers may only export the result artifact. "
+                "Include the newly created result artifact in the exported task diff. "
+                "Do not include it in the source implementation."
+            )
         job = self.job(context, role, inputs)
         record = self.gateway.store.cloud_task(job.id)
         if record and record["state"] in ("import_uncertain", "imported"):
