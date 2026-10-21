@@ -94,7 +94,11 @@ class CodexCloudGateway:
         status_help = self.runner(["codex", "cloud", "status", "--help"])
         diff_help = self.runner(["codex", "cloud", "diff", "--help"])
         list_help = self.runner(["codex", "cloud", "list", "--help"])
-        auth = self.runner(["codex", "login", "status"])
+        try:
+            auth = self.runner(["codex", "login", "status"])
+        except IntegrationUnavailable:
+            auth = ""
+        # Never return raw login output: API-key login status can include key fragments.
         return {
             "version": version.strip(),
             "submit_interface_present": all(flag in help_text for flag in ("--env", "--branch")),
@@ -102,6 +106,8 @@ class CodexCloudGateway:
             "diff_interface_present": "TASK_ID" in diff_help,
             "list_json_interface_present": "--json" in list_help,
             "chatgpt_login_reported": "ChatGPT" in auth,
+            "unattended_cloud_auth_verified": False,
+            "account_quota_remaining": None,
             "remote_task_verified": False,
             "provider_cost_limit_available": False,
             "provider_cancel_available": False,
