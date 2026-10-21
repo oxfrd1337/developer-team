@@ -1,0 +1,8 @@
+Implementiere für dieses vollständig künstliche Projekt die Funktion add(a, b).
+Sie soll int und float einschließlich negativer Zahlen und Null addieren.
+Boolesche Werte und alle anderen nichtnumerischen Eingaben müssen TypeError auslösen.
+Ergänze eigene automatisierte Tests und eine kurze deutsche Benutzungsdokumentation.
+Arbeite ausschließlich an pilot_project/calculator.py,
+pilot_project/tests/test_calculator.py und pilot_project/usage.md.
+Die Betreiberprüfungen in pilot_project/acceptance.py bleiben unverändert.
+Es gibt keine Netzwerkdienste, echten Daten oder produktiven Deployments.

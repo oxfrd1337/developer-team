@@ -5,6 +5,7 @@ from __future__ import annotations
 import fcntl
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
@@ -52,8 +53,16 @@ class RunStore:
                 );
             """)
 
-    def connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.path, timeout=5)
+    @contextmanager
+    def connect(self) -> Iterator[sqlite3.Connection]:
+        connection = sqlite3.connect(self.path, timeout=5)
+        try:
+            with connection:
+                yield connection
+        finally:
+            # sqlite3.Connection.__exit__ commits/rolls back but does not close.
+            # Repeated polls/checkpoints must not rely on garbage collection.
+            connection.close()
 
     @contextmanager
     def lock(self, run_id: str):

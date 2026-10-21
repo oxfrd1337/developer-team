@@ -56,3 +56,118 @@ jobs:
           name: dt-001-synthetic-report
           path: ${{ runner.temp }}/dt-001-smoke/report.json
           retention-days: 7
+
+  codex-runner-probe:
+    name: Codex CLI interface on Actions (no login or tasks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Install the observed CLI version without credentials
+        run: npm install --prefix "$RUNNER_TEMP/dt-codex" --ignore-scripts --no-audit --no-fund @openai/codex@0.163.0
+      - name: Read only CLI help and sanitized login status
+        run: |
+          export PATH="$RUNNER_TEMP/dt-codex/node_modules/.bin:$PATH"
+          python -m developer_team probe-codex > "$RUNNER_TEMP/codex-probe.json"
+          cat "$RUNNER_TEMP/codex-probe.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          probe = json.loads((Path(os.environ['RUNNER_TEMP']) / 'codex-probe.json').read_text())
+          required = ('submit_interface_present', 'status_interface_present',
+                      'diff_interface_present', 'list_json_interface_present')
+          assert all(probe[key] for key in required)
+          assert probe['version'] == 'codex-cli 0.163.0'
+          assert probe['remote_task_verified'] is False
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dt-003-actions-codex-probe
+          path: ${{ runner.temp }}/codex-probe.json
+          if-no-files-found: error
+          retention-days: 7
+
+  pilot-checkpoint:
+    name: Prepare and pause test-adapter pilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      pilot_run_id: ${{ steps.prepare.outputs.pilot_run_id }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Prepare, pause at a simulated task and export state
+        id: prepare
+        run: |
+          python -m developer_team pilot-prepare --output "$RUNNER_TEMP/session"
+          python -m developer_team pilot-step --session "$RUNNER_TEMP/session"
+          python -m developer_team pilot-checkpoint --session "$RUNNER_TEMP/session" --output "$RUNNER_TEMP/checkpoint"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads((Path(os.environ['RUNNER_TEMP']) / 'session/report.json').read_text())
+          assert report['status'] == 'paused'
+          assert len(report['tasks']) == 1
+          with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:
+              output.write(f"pilot_run_id={report['run_id']}\n")
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dt-003-ci-checkpoint
+          path: ${{ runner.temp }}/checkpoint/
+          if-no-files-found: error
+          retention-days: 7
+
+  pilot-restore:
+    name: Resume test-adapter pilot on a fresh runner
+    needs: pilot-checkpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DT_CONTROLLER_SHA: ${{ github.sha }}
+      DT_PILOT_RUN_ID: ${{ needs.pilot-checkpoint.outputs.pilot_run_id }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dt-003-ci-checkpoint
+          path: ${{ runner.temp }}/checkpoint
+      - name: Restore the same run and finish the bounded QA correction
+        run: |
+          python -m developer_team pilot-restore --checkpoint "$RUNNER_TEMP/checkpoint" \
+            --output "$RUNNER_TEMP/resumed" --controller-sha "$DT_CONTROLLER_SHA" --run-id "$DT_PILOT_RUN_ID"
+          python -m developer_team pilot-step --session "$RUNNER_TEMP/resumed" --ticks 24
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads((Path(os.environ['RUNNER_TEMP']) / 'resumed/report.json').read_text())
+          assert report['status'] == 'blocked'
+          assert report['repairs'] == {'qa': 1}
+          assert report['real_cloud_submissions'] == report['real_remote_mutations'] == 0
+          assert set(report['checks'].values()) == {'pass'}
+          assert len(report['tasks']) == len({t['task_id'] for t in report['tasks']}) == 6
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dt-003-ci-rehearsal-report
+          path: ${{ runner.temp }}/resumed/report.json
+          if-no-files-found: error
+          retention-days: 7

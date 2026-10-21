@@ -1,0 +1,153 @@
+name: DT-003 manual preparation (test adapters only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Neuer Testadapter-Lauf oder explizite Wiederaufnahme
+        type: choice
+        options: [start, resume]
+        default: start
+      scenario:
+        description: Künstliches Szenario (nur beim Start)
+        type: choice
+        options: [qa-fix, happy, test-fix, repair-limit]
+        default: qa-fix
+      max_tasks:
+        description: Taskbudget 1 bis 8 (nur beim Start)
+        default: '8'
+      runtime_seconds:
+        description: Simulierte Gesamtlaufzeit 60 bis 3600 Sekunden (nur beim Start)
+        default: '600'
+      max_repairs:
+        description: Korrekturen je Fehlerklasse 0 bis 3 (nur beim Start)
+        default: '1'
+      ticks:
+        description: Begrenzte Testadapter-Aufrufe dieses Runners (1 bis 24)
+        default: '1'
+      source_run:
+        description: Exakte erfolgreiche Actions-Run-ID des Checkpoints (bei resume)
+        default: ''
+      artifact_id:
+        description: Exakte Checkpoint-Artefakt-ID (bei resume)
+        default: ''
+      pilot_run_id:
+        description: Unveränderte Pilot-UUID aus dem Bericht (bei resume)
+        default: ''
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: dt-003-manual-preparation
+  cancel-in-progress: false
+
+jobs:
+  rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DT_MODE: ${{ inputs.mode }}
+      DT_SCENARIO: ${{ inputs.scenario }}
+      DT_MAX_TASKS: ${{ inputs.max_tasks }}
+      DT_RUNTIME: ${{ inputs.runtime_seconds }}
+      DT_REPAIRS: ${{ inputs.max_repairs }}
+      DT_TICKS: ${{ inputs.ticks }}
+      DT_SOURCE_RUN: ${{ inputs.source_run }}
+      DT_ARTIFACT_ID: ${{ inputs.artifact_id }}
+      DT_PILOT_RUN: ${{ inputs.pilot_run_id }}
+      DT_REPOSITORY: ${{ github.repository }}
+      DT_CONTROLLER_SHA: ${{ github.sha }}
+      DT_ATTEMPT: ${{ github.run_attempt }}
+    steps:
+      - name: Checkout reviewed controller without write credentials
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Require explicit checkpoint continuation instead of job rerun
+        run: test "$DT_ATTEMPT" = 1
+      - name: Define disposable runner paths
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          with Path(os.environ['GITHUB_ENV']).open('a') as output:
+              output.write(f"DT_SESSION={os.environ['RUNNER_TEMP']}/dt-003-session\n")
+              output.write(f"DT_CHECKPOINT={os.environ['RUNNER_TEMP']}/dt-003-checkpoint\n")
+          PY
+      - name: Prepare a new disposable session
+        if: inputs.mode == 'start'
+        run: |
+          python -m developer_team pilot-prepare --output "$DT_SESSION" \
+            --scenario "$DT_SCENARIO" --max-tasks "$DT_MAX_TASKS" \
+            --runtime-seconds "$DT_RUNTIME" --max-repairs "$DT_REPAIRS"
+      - name: Verify exact checkpoint producer (read only)
+        if: inputs.mode == 'resume'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m developer_team pilot-check-source --repository "$DT_REPOSITORY" \
+            --sha "$DT_CONTROLLER_SHA" --source-run "$DT_SOURCE_RUN" \
+            --artifact-id "$DT_ARTIFACT_ID"
+      - name: Download only the verified checkpoint
+        if: inputs.mode == 'resume'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ inputs.artifact_id }}
+          run-id: ${{ inputs.source_run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/dt-003-download
+          merge-multiple: true
+      - name: Restore journal and commits together, preserving all budgets
+        if: inputs.mode == 'resume'
+        run: |
+          python -m developer_team pilot-restore --checkpoint "$RUNNER_TEMP/dt-003-download" \
+            --output "$DT_SESSION" --controller-sha "$DT_CONTROLLER_SHA" \
+            --run-id "$DT_PILOT_RUN"
+      - name: Execute bounded test-adapter work through the existing Engine
+        run: python -m developer_team pilot-step --session "$DT_SESSION" --ticks "$DT_TICKS"
+      - name: Create portable test-only checkpoint
+        if: always()
+        run: python -m developer_team pilot-checkpoint --session "$DT_SESSION" --output "$DT_CHECKPOINT"
+      - name: Retain exact checkpoint (never credentials or a raw checkout)
+        id: state
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dt-003-checkpoint-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/dt-003-checkpoint/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain progress report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dt-003-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/dt-003-session/report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish concise operator summary
+        if: always()
+        env:
+          DT_SAVED_ARTIFACT: ${{ steps.state.outputs.artifact-id }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads((Path(os.environ['DT_SESSION']) / 'report.json').read_text())
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a') as summary:
+              summary.write('DT-003: ausschließlich Testadapter, echte Cloud-Aufträge: **0**.\n\n')
+              summary.write(f"Status: **{report['status']}**; Pilot-UUID: `{report['run_id']}`.\n\n")
+              summary.write(f"Tasks: {len(report['tasks'])}; Korrekturen: {report['repairs']}.\n\n")
+              summary.write(f"Checkpoint-Artefakt-ID: `{os.environ['DT_SAVED_ARTIFACT']}`.\n\n")
+              summary.write('Wiederaufnahme nur mit derselben Controller-SHA und expliziten IDs. '
+                            'Ein Live-Pilot benötigt eine separate Freigabe und die Voraussetzungen '
+                            'aus docs/dt-003.md. Kein Merge oder Deployment.\n')
+          PY

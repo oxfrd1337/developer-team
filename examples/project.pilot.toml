@@ -1,0 +1,41 @@
+schema_version = 1
+
+[project]
+id = "dt-003-pilot"
+repository = "oxfrd1337/developer-team"
+provider = "github"
+base_branch = "main"
+languages = ["python"]
+frameworks = ["unittest"]
+
+[instructions]
+files = ["AGENTS.md"]
+
+[security]
+policy_files = ["SECURITY.md"]
+protected_paths = ["developer_team/**", "tests/**", "examples/**", "docs/**", "pyproject.toml", "requirements-dev.txt", "MANIFEST.in", ".gitignore", "README.md", "pilot_project/acceptance.py", "pilot_project/requirement.txt"]
+
+[[checks]]
+name = "pilot-acceptance"
+kind = "test"
+argv = ["python3", "-m", "unittest", "pilot_project.acceptance", "-v"]
+timeout_seconds = 15
+required = true
+
+[[checks]]
+name = "pilot-unit"
+kind = "test"
+argv = ["python3", "-m", "unittest", "discover", "-s", "pilot_project/tests", "-v"]
+timeout_seconds = 15
+required = true
+
+[merge]
+enabled = false
+
+[limits]
+max_repairs_per_class = 1
+max_steps = 60
+
+[delivery]
+test_paths = ["pilot_project/tests/**"]
+documentation_paths = ["pilot_project/usage.md"]

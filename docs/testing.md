@@ -6,6 +6,12 @@ Repositories. Adaptertests verwenden ausdrücklich nachgebildete CLI-/REST-Antwo
 Eine positive simulierte Merge-Entscheidung erhöht lediglich einen lokalen Zähler;
 sie führt weder `git merge` noch einen API-Aufruf aus.
 
+DT-003 ergänzt `tests/test_pilot.py`: künstliches Unterprojekt im selben Repository,
+strikte Importgrenzen, echte Abnahmetests, begrenzte Test-/QA-Korrekturen, Taskbudgets,
+Portable-Checkpoint mit Runnerwechsel, Verlust/Manipulation von Zustand sowie
+Artefaktherkunft und sichere CLI-Probe. [dt-003.md](dt-003.md) beschreibt Betrieb und
+Startsperren; [dt-003-validation.md](dt-003-validation.md) hält beobachtete Ergebnisse fest.
+
 DT-002 ergänzt `tests/test_cloud.py` mit kontrollierten CLI-/Ref-Testadaptern,
 echten temporären Git-Importen und lokalen Testprozessen. Lifecycle, Reviewtrennung,
 Wiederaufnahme mit neuem Controller, Korrekturen und Merge-Sperre sowie die Grenzen
@@ -19,6 +25,7 @@ python -m unittest discover -s tests -t . -v
 .venv/bin/python -m ruff check developer_team tests
 .venv/bin/python -m ruff format --check developer_team tests
 .venv/bin/python -m build --no-isolation
+python -m developer_team validate examples/project.pilot.toml
 ```
 
 ## Abdeckung der geforderten Fälle
@@ -72,6 +79,13 @@ mit `safe_test_mode=True`. Dieses Testobjekt aktiviert kein Repository und ist k
 CLI-Schalter. Die Demo schreibt weder reale PRs noch externe Branches.
 
 ## GitHub Actions und Aussagegrenzen
+
+DT-003 ergänzt drei Jobs: reale Installation/lesende Probe der CLI 0.163.0 ohne
+Anmeldung oder Auftrag, Export eines pausierten Testadapterlaufs und Wiederaufnahme
+auf einem frischen Runner aus demselben exakten Artefakt. Die neue manuelle
+`cloud-pilot.yml` bleibt ausschließlich auf Testadapter begrenzt. Ein separater
+`workflow_dispatch`-Start kann erst nach manueller Aufnahme in den Defaultbranch
+geprüft werden; CI-Nachweise dafür werden nicht erfunden.
 
 `ci.yml` prüft Python 3.11, 3.12 und 3.13 auf Ubuntu: Lint mit Sicherheitsregeln,
 Formatierung, Tests mit Branch-Messung, mindestens 80 % Gesamtabdeckung, Wheel/SDist

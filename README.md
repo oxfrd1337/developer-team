@@ -1,4 +1,4 @@
-# Universelles KI-Entwicklerteam · DT-001 / DT-002
+# Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
 Modularer Python-Kern für Anforderung, Planung, Architektur, Entwicklung, Tests,
 unabhängigen QA- und Security-Review, Korrekturen und kontrollierte PR-Freigabe.
@@ -89,3 +89,11 @@ python -m venv .venv
 Nach optionaler Installation per `pip install -e .` heißt der Einstiegspunkt
 `developer-team`. Beispielkonfigurationen werden über ihren expliziten Pfad geladen;
 die Befehle oben werden im Repository-Verzeichnis ausgeführt.
+
+## DT-003: kontrollierte Cloud-Vorbereitung
+
+Der manuelle GitHub-Actions-Workflow und das künstliche Pilotprojekt sind ausschließlich
+mit Testadaptern vorbereitet. Echte Cloud-Aufträge benötigen eine separate konkrete
+Freigabe; es gibt keine Live-Aktivierung und keinen automatischen Merge.
+[Betrieb, Kosten und Freigabeablauf](docs/dt-003.md) ·
+[Beobachtete Prüfungen](docs/dt-003-validation.md).

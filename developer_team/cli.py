@@ -9,6 +9,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .adapters.codex_cloud import CodexCloudGateway
+from .adapters.github import GhCliTransport
 from .adapters.synthetic import (
     REQUIREMENT,
     SCENARIOS,
@@ -17,9 +18,12 @@ from .adapters.synthetic import (
     create_fixture,
 )
 from .authority import ProjectGrant, synthetic_authority
+from .checkpoints import check_artifact_source, checkpoint, restore_checkpoint
 from .config import load_config
 from .engine import Engine
 from .models import RunStatus, TeamError
+from .pilot import SCENARIOS as PILOT_SCENARIOS
+from .pilot import prepare_session, step_rehearsal
 from .store import RunStore
 
 
@@ -46,6 +50,33 @@ def parser() -> argparse.ArgumentParser:
     )
     show.add_argument("--state", type=Path, required=True)
     show.add_argument("--run-id", required=True)
+    prepare = commands.add_parser(
+        "pilot-prepare", help="Prepare only a disposable pilot with test adapters; no cloud calls"
+    )
+    prepare.add_argument("--source", type=Path, default=Path(__file__).resolve().parents[1])
+    prepare.add_argument("--output", type=Path, required=True)
+    prepare.add_argument("--scenario", choices=PILOT_SCENARIOS, default="qa-fix")
+    prepare.add_argument("--max-tasks", type=int, default=8)
+    prepare.add_argument("--runtime-seconds", type=int, default=600)
+    prepare.add_argument("--max-repairs", type=int, default=1)
+    step = commands.add_parser("pilot-step", help="Resume the same test-adapter rehearsal")
+    step.add_argument("--session", type=Path, required=True)
+    step.add_argument("--ticks", type=int, default=1)
+    save = commands.add_parser("pilot-checkpoint", help="Export rehearsal journal and Git commits")
+    save.add_argument("--session", type=Path, required=True)
+    save.add_argument("--output", type=Path, required=True)
+    restore = commands.add_parser("pilot-restore", help="Restore an exact test-only checkpoint")
+    restore.add_argument("--checkpoint", type=Path, required=True)
+    restore.add_argument("--output", type=Path, required=True)
+    restore.add_argument("--controller-sha", required=True)
+    restore.add_argument("--run-id", required=True)
+    provenance = commands.add_parser(
+        "pilot-check-source", help="Read GitHub producer metadata before downloading a checkpoint"
+    )
+    provenance.add_argument("--repository", required=True)
+    provenance.add_argument("--sha", required=True)
+    provenance.add_argument("--source-run", required=True)
+    provenance.add_argument("--artifact-id", required=True)
     return result
 
 
@@ -69,6 +100,46 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "probe-codex":
             print(json.dumps(CodexCloudGateway().probe(), indent=2))
             return 0
+        if args.command == "pilot-check-source":
+            check_artifact_source(
+                GhCliTransport(),
+                repository=args.repository,
+                sha=args.sha,
+                source_run=args.source_run,
+                artifact_id=args.artifact_id,
+            )
+            print(json.dumps({"producer_verified": True, "live_dispatch_authorized": False}))
+            return 0
+        if args.command == "pilot-checkpoint":
+            print(json.dumps(checkpoint(args.session, args.output), indent=2))
+            return 0
+        if args.command in ("pilot-prepare", "pilot-step", "pilot-restore"):
+            if args.command == "pilot-prepare":
+                report = prepare_session(
+                    args.source,
+                    args.output,
+                    scenario=args.scenario,
+                    max_tasks=args.max_tasks,
+                    runtime_seconds=args.runtime_seconds,
+                    max_repairs=args.max_repairs,
+                )
+            elif args.command == "pilot-restore":
+                report = restore_checkpoint(
+                    args.checkpoint,
+                    args.output,
+                    controller_sha=args.controller_sha,
+                    run_id=args.run_id,
+                )
+            else:
+                report = step_rehearsal(args.session, ticks=args.ticks)
+            print(
+                json.dumps(
+                    {key: report[key] for key in ("mode", "run_id", "status", "ticks")}
+                    | {"cloud_execution_verified": False, "tasks": len(report["tasks"])},
+                    indent=2,
+                )
+            )
+            return int(report["status"] in ("escalated", "interrupted"))
         if args.command == "show":
             if not args.state.is_file():
                 raise TeamError("State database does not exist")

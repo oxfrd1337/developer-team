@@ -5,13 +5,17 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from ..config import ProjectConfig, relative_path
+from ..config import ProjectConfig, matches, relative_path
 from ..models import Role, TeamError
 from ..workspace import GitWorkspace
 from .cloud_contracts import RESULT_PATH, CloudJob, strict_json
 
 
 class CloudResultImporter:
+    def __init__(self, *, allowed_paths: tuple[str, ...] | None = None):
+        # Controller-owned scope; project instructions cannot widen it.
+        self.allowed_paths = allowed_paths
+
     def extract(
         self, workspace: GitWorkspace, config: ProjectConfig, job: CloudJob, patch: str
     ) -> tuple[dict, str]:
@@ -55,6 +59,8 @@ class CloudResultImporter:
             )
             for path in paths:
                 relative_path(path)
+                if self.allowed_paths is not None and not matches(path, self.allowed_paths):
+                    raise TeamError("Cloud source import exceeds the controller's pilot scope")
                 if ".git" in Path(path).parts or config.protected(path):
                     raise TeamError(
                         "Cloud source import touches protected controls; manual review required"
