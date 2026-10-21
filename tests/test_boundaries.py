@@ -21,16 +21,10 @@ from developer_team.workspace import GitWorkspace
 
 
 class BoundaryProbeTests(unittest.TestCase):
-    def test_real_host_probes_are_explicit_and_never_authorize_ai(self):
-        with (
-            patch.object(CodexExecGateway, "execute", side_effect=AssertionError("No AI")),
-            patch.dict(os.environ, {"DT006_FAKE_CREDENTIAL": "dummy-parent-env-value"}),
-        ):
-            report = probe.collect_boundary_report()
+    def assert_no_go_report(self, report):
         self.assertEqual(report["decision"], "NO-GO")
         self.assertIs(report["live_dispatch_authorized"], False)
         self.assertEqual(report["ai_calls"], 0)
-        self.assertNotIn("dummy-parent-env-value", json.dumps(report))
         observations = report["probes"]
         for key in (
             "credential-broker",
@@ -43,10 +37,63 @@ class BoundaryProbeTests(unittest.TestCase):
         available = observations["namespace-prerequisite"]["status"] == "PASS"
         for role in probe.ROLES:
             for key in ("namespace-separation", *probe._keys(role)):
-                observed = observations[f"{role}:{key}"]
-                self.assertEqual(observed["status"], "PASS" if available else "UNSUPPORTED", report)
-            if available:
-                self.assertEqual(observations[f"{role}:canary-integrity"]["status"], "PASS")
+                observation = observations[f"{role}:{key}"]
+                if not available:
+                    self.assertEqual(observation["status"], "UNSUPPORTED")
+        for name, observation in observations.items():
+            # UNSUPPORTED is an explicit missing proof; an allowed access still fails CI.
+            self.assertIn(observation["status"], {"PASS", "UNSUPPORTED"}, (name, observation))
+
+    def report_fixture(self):
+        """Synthetic report contract; never evidence about the current host."""
+        observations = {
+            f"{role}:{key}": {"status": "PASS"}
+            for role in probe.ROLES
+            for key in ("namespace-separation", *probe._keys(role))
+        }
+        observations["namespace-prerequisite"] = {"status": "PASS"}
+        for key in (
+            "credential-broker",
+            "model-only-egress",
+            "external-supervisor",
+            "resource-enforcement",
+            "host-role-identities",
+        ):
+            observations[key] = {"status": "UNSUPPORTED"}
+        return {
+            "decision": "NO-GO",
+            "live_dispatch_authorized": False,
+            "ai_calls": 0,
+            "probes": observations,
+        }
+
+    def test_real_host_probes_are_explicit_and_never_authorize_ai(self):
+        with (
+            patch.object(CodexExecGateway, "execute", side_effect=AssertionError("No AI")),
+            patch.dict(os.environ, {"DT006_FAKE_CREDENTIAL": "dummy-parent-env-value"}),
+        ):
+            report = probe.collect_boundary_report()
+        self.assertNotIn("dummy-parent-env-value", json.dumps(report))
+        self.assert_no_go_report(report)
+
+    def test_partial_host_support_retains_unsupported_without_requiring_pass(self):
+        report = self.report_fixture()
+        for key in ("qa:dns", "security:abstract-socket", "probe-completion"):
+            report["probes"][key] = {"status": "UNSUPPORTED", "reason": "synthetic limitation"}
+        self.assert_no_go_report(report)
+        self.assertEqual(report["probes"]["qa:namespace-separation"]["status"], "PASS")
+        self.assertEqual(report["probes"]["qa:dns"]["status"], "UNSUPPORTED")
+        self.assertEqual(report["decision"], "NO-GO")
+
+    def test_failed_and_unknown_observations_are_rejected_even_in_no_go_report(self):
+        for status in ("FAIL", "SKIP", "GO", "", None, True):
+            with self.subTest(status=status):
+                report = self.report_fixture()
+                report["probes"]["qa:credential-read"] = {"status": status}
+                with self.assertRaises(AssertionError):
+                    self.assert_no_go_report(report)
+                self.assertEqual(report["probes"]["qa:credential-read"]["status"], status)
+                self.assertEqual(report["decision"], "NO-GO")
 
     def test_missing_tool_or_denied_kernel_reports_unsupported_without_fallback(self):
         with patch("shutil.which", return_value=None), patch("subprocess.Popen") as popen:
@@ -90,6 +137,7 @@ class BoundaryProbeTests(unittest.TestCase):
             report = probe.collect_boundary_report()
         self.assertEqual(report["probes"]["probe-completion"]["status"], "UNSUPPORTED")
         self.assertEqual(report["probes"]["qa:credential-read"]["status"], "UNSUPPORTED")
+        self.assert_no_go_report(report)
 
     def test_bad_json_timeout_and_os_errors_never_produce_pass(self):
         with tempfile.TemporaryDirectory() as directory:

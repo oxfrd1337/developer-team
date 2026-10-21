@@ -5,9 +5,11 @@
 Datum: 21.10.2026, UTC. Geprüft wurde die verwaltete Codex-Arbeitsumgebung
 mit Linux 6.18.55, Python 3.12.14 und Python 3.13.5. Sie ist kein GitHub Codespace.
 Auditbasis: `737dffc705b368e550e0a38803068e23b9c56d09` (gemergtes DT-005).
-Die ursprüngliche lokale Kopie war noch auf DT-004. Die DT-005-Dateien wurden über
-den vorhandenen GitHub-Connector gelesen und ihre Blob-, Tree- und Commit-SHAs
-vor dem Anlegen des Entwicklungsbranches gegen die Git-Objekte geprüft.
+Reviewgrundlage ist PR #7 bei `54c4612ff2b00279e3291c4b1008d6331a6a116a` und der
+[Review-Kommentar vom 21.10.2026](https://github.com/oxfrd1337/developer-team/pull/7#issuecomment-6326858522).
+Diese Revision prüft ein festes Diagnoseformat vor jedem Schreibzugriff und trennt
+die Hostmessung von deterministischen Status-Vertragstests. Sie aktualisiert
+ausschließlich den bestehenden Draft-PR #7.
 
 Die neue Implementierung startet keine echten KI-Agenten. Alle Tests verwenden
 controllerseitige Python-Simulatoren und temporäre synthetische Repositories.
@@ -19,9 +21,9 @@ gebucht und keine Container-/VM-Ressourcen angelegt.
 
 | Ausgeführte Prüfung | Beobachtung |
 | --- | --- |
-| `python -m unittest discover -s tests -t . -v` unter Python 3.12.14 | **199 Tests erfolgreich**, kein Skip. |
-| `/usr/bin/python3.13 -m unittest discover -s tests -t . -v` | **199 Tests erfolgreich**, kein Skip. |
-| `python -m unittest tests.test_exec tests.test_boundaries -v` | **33 Tests erfolgreich**; darunter die 17 neuen Sicherheits-/Isolationsregressionen. |
+| `python -m unittest discover -s tests -t . -v` unter Python 3.12.14 | **203 Tests erfolgreich**, kein Skip. |
+| `/usr/bin/python3.13 -m unittest discover -s tests -t . -v` | **203 Tests erfolgreich**, kein Skip. |
+| `python -m unittest tests.test_exec tests.test_boundaries -v` | **37 Tests erfolgreich**; vier zusätzliche Testfälle der Reviewrevision und erweiterte Negativmatrizen. |
 | `python -m developer_team.boundary_probe` | **NO-GO**, erwarteter Exitcode 2; 97 bestandene Einzelbeobachtungen, 5 ausdrücklich `UNSUPPORTED`. Keine KI-Aufrufe. |
 | `python -m developer_team validate examples/project.synthetic.toml` | Gültig, `grants_authority=false`. |
 | `python -m developer_team validate examples/project.pilot.toml` | Gültig, `grants_authority=false`. |
@@ -32,7 +34,7 @@ gebucht und keine Container-/VM-Ressourcen angelegt.
 
 Die Messung der Hostgrenzen ist in
 [dt-006-boundary-report.json](dt-006-boundary-report.json) gespeichert, erhoben am
-`2026-10-21T21:13:27.793009+00:00`. Der Bericht enthält den SHA-256 der tatsächlich
+`2026-10-21T21:31:49.425841+00:00`. Der Bericht enthält den SHA-256 der tatsächlich
 ausgeführten `boundary_probe.py`:
 `9b063407143699b15f92a8228496d321d413eb4e7bd1b5ceb88c0b044109c413`.
 Die Datei ist ein Beobachtungsartefakt, keine gespeicherte Startberechtigung.
@@ -44,6 +46,18 @@ Positivkontrollen. Snapshotdateien und Canaries blieben unverändert. Fehlende
 Namensraumfunktionen, Fehler und unvollständige Resultate werden zusätzlich
 modellfrei in den Regressionstests nachgebildet und müssen `UNSUPPORTED` ergeben.
 Diese Vertragstests sind keine ausgeführten Hostprobes auf einem anderen System.
+
+Für die Diagnose-Schnittstelle wurden falsche Herkunft/Quelle, echte oder nur
+ähnlich falsche Attestierungswerte (z. B. `0`), fehlende/zusätzliche Felder, falsche
+Digesttypen/-längen/-zeichen, Dict-Unterklassen, fremde Job-/HEAD-Bindungen sowie
+unvollständige oder nicht simulierte Transporte abgelehnt. Aufruf und Ereignisliste
+bleiben dabei unverändert. Gültige Diagnose bleibt `origin=simulated` und
+`execution_attested=false`; ein neuer Controller erhält daraus keine Receipts.
+
+Die getrennten synthetischen Berichtstests erlauben Basis-Namespaces zusammen mit
+einzelnen `UNSUPPORTED`-Ergebnissen und unvollständigen Folgeprobes. Sie weisen
+`FAIL` und unbekannte Statuswerte zurück, auch wenn der Gesamtbericht NO-GO sagt.
+Die echte Hostprobe verlangt deshalb keinen erfundenen PASS für fehlende Funktionen.
 
 **Alle vier Rollen meldeten UID 1000.** Die Namespaces und Mountgrenzen der Probe
 sind keine getrennten Hostidentitäten. Die fünf offenen Komponenten sind:
@@ -58,10 +72,9 @@ Zusätzlich bleiben unveränderliche Live-Reviewer-Mounts und ein geschützter
 unabhängiger Attestierungskollektor offen. Die separaten Simulator-Kopien werden
 durch die neuen Inhaltsprüfungen nicht zu einer unveränderlichen OS-Grenze.
 
-## Noch offene Pflichtchecks
+## Lokale Werkzeuggrenzen und vollständige CI
 
-**Die CI-Akzeptanz ist noch nicht vollständig nachgewiesen.** Folgende Aufrufe
-wurden versucht und scheiterten an fehlenden lokalen Modulen:
+Folgende Aufrufe wurden erneut lokal versucht und scheiterten an fehlenden Modulen:
 
 ```text
 python -m ruff check developer_team tests       -> No module named ruff
@@ -71,25 +84,38 @@ python -m build --no-isolation                 -> No module named build
 ```
 
 Damit sind Ruff inklusive Securityregeln, Ruff-Format, Branch-Coverage ≥80 % und
-das gepinnte Build-Frontend **offen**, nicht bestanden. Der zusätzliche direkte
+das gepinnte Build-Frontend **lokal offen**, nicht bestanden. Der zusätzliche direkte
 Backend-Build ersetzt diese fehlenden Werkzeug-/CI-Nachweise nicht. Python 3.11
 ist lokal nicht vorhanden; auch dessen Matrixlauf bleibt offen.
 
-Das lokale Netzwerkpolicy-Snapshot erlaubt keine externen HTTP-/TCP-Zielhosts;
-die Laufzeitstatusabfrage meldet keinen nachgewiesen erzwungenen HTTP-Status und
+Das lokale Netzwerkpolicy-Snapshot erlaubt keine externen HTTP-/TCP-Zielhosts.
+Die aktuelle Laufzeitstatusabfrage meldet `mode=disabled`, `state=enforced` und
 keine konfigurierten Credentials/Identitäten. Abhängigkeiten wurden deshalb nicht
 aus dem Netz nachinstalliert; keine Proxy-, Auth- oder Policyumgehung.
 
-Das Repository ist privat. Da zusätzliche Actions-Kosten nicht ausgeschlossen
-werden können, erhält der Entwicklungscommit `[skip ci]`; es wird kein neuer
-Actions-Lauf angefordert. Die bestehende CI und sämtliche Merge-/Schutzregeln
-bleiben unverändert. Ausgelassene erforderliche Checks bleiben ausstehend und
-berechtigen zu keiner Freigabe. Der PR bleibt Draft und wird nicht gemergt.
+Der ursprüngliche PR-HEAD enthielt `[skip ci]` und hatte deshalb keine Pflicht-CI.
+Die Kostenprüfung dieser Revision ergab: Der GitHub-Connector bietet keine
+Billing-/Kontingentfunktion und unterstützt keine User-/Organisation-Billing-APIs;
+direkte Abfragen aus dem Worker sind durch die Netzpolicy gesperrt. Weder Restminuten
+noch freier Artefaktspeicher konnten unabhängig abgelesen werden. Ein unbekanntes
+Kontingent wird nicht als kostenfreies Restbudget ausgegeben.
 
-Nächster Prüfschritt: die unveränderten Checks aus [testing.md](testing.md) mit der
-bereits freigegebenen gepinnten Werkzeugkette auf einer nachweislich kostenfreien
-Prüfressource ausführen. Es wird kein grüner Python-3.11-/Ruff-/Coverage-/CI-Lauf
-aus den beiden erfolgreichen lokalen Testläufen abgeleitet.
+Der Auftraggeber hat anschließend ausdrücklich angewiesen, den regulären Lauf
+im kostenlosen Kontingent zu versuchen, und angegeben, dass keine Zahlungsdaten
+hinterlegt sind. Auf dieser Grundlage entfällt `[skip ci]` beim Reviewcommit.
+Es werden nur die bestehenden sechs Linux-Jobs der unveränderten CI versucht:
+drei Qualitätsjobs mit je 10 Minuten Timeout und drei weitere Jobs mit je 5 Minuten,
+zusammen 45 konfigurierte Jobminuten. Das ist keine Garantie über tatsächliche
+Abrechnungsminuten oder gleichzeitigen Kontoverbrauch. Keine neuen Runnerklassen,
+Käufe, Zahlungsdaten, Budgets oder Billing-Einstellungen; bei einer von GitHub
+gemeldeten Kontingent-/Abrechnungssperre stoppen und diese dokumentieren.
+
+Die vollständige CI muss Python 3.11/3.12/3.13, Ruff inklusive Securityregeln,
+Format, vollständige Suite mit Branch-Coverage ≥80 %, Build und Smoke für denselben
+PR-HEAD belegen. Verbindliche Commit-SHA, Workflow-URLs und tatsächlich beobachtete
+Ergebnisse werden in der Beschreibung von [PR #7](https://github.com/oxfrd1337/developer-team/pull/7)
+festgehalten. Es wird kein CI-PASS aus den lokalen Tests abgeleitet. Die bestehende
+CI und alle Merge-/Schutzregeln bleiben unverändert; der PR bleibt Draft.
 
 ## Nächste Betriebsentscheidung
 

@@ -11,6 +11,11 @@ Design und Aussagegrenzen: [dt-006.md](dt-006.md); tatsächlich ausgeführte Che
 [dt-006-validation.md](dt-006-validation.md). Alle bisherigen CI-Anforderungen gelten
 weiter; nicht verfügbare Werkzeuge oder nicht gestartete Jobs sind offene Checks.
 
+Die Reviewkorrektur zu PR #7 ergänzt Schema-/Typ-/Digest-/Transporttests für die
+Diagnose-Schnittstelle sowie getrennte Vertragstests für teilweise verfügbare
+Hostgrenzen. `UNSUPPORTED` bleibt ein fehlender Nachweis bei **NO-GO**; tatsächliche
+Zugriffsverletzungen (`FAIL`) und unbekannte Statuswerte lassen den Hosttest scheitern.
+
 DT-004 ergänzt `tests/test_supervised_pilot.py`: lokale Vorbereitung ohne Cloud,
 feste Dateigrenzen, vier Umgebungen, unveränderliche Grants/Budgets, verlorenes Journal,
 gesperrte Anmeldung/Sandbox, Ergebnis-/Status-/Testbelege sowie echte Python-Fehler

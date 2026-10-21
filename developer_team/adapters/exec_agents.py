@@ -141,7 +141,7 @@ class CodexExecAgents(StructuredAgents):
                     "payload_digest": digest(payload),
                     "source_patch_digest": digest(source),
                     "execution_attested": False,
-                    "origin": Origin.SIMULATED,
+                    "origin": Origin.SIMULATED.value,
                 },
             )
         return job, payload, source

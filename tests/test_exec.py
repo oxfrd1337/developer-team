@@ -50,6 +50,22 @@ class ExecTests(unittest.TestCase):
         raw = json.dumps((job or self.job).envelope() | {"payload": {"ok": True}})
         return f"print({raw!r})"
 
+    def verification(self):
+        return {
+            "source": "controller:exec-result-validator-v1",
+            "origin": "simulated",
+            "execution_attested": False,
+            "head_sha": self.job.head_sha,
+            "tree_sha": "b" * 40,
+            "content_digest": digest("content"),
+            "inventory_digest": digest("inventory"),
+            "controller_inventory_digest": digest("controller inventory"),
+            "controller_checks_digest": digest("controller checks"),
+            "patch_digest": digest("patch"),
+            "payload_digest": digest("payload"),
+            "source_patch_digest": digest("source patch"),
+        }
+
     def test_live_is_unconditionally_blocked_before_process_creation(self):
         with patch("subprocess.Popen") as popen:
             with self.assertRaisesRegex(PermissionDenied, "Live codex exec blocked"):
@@ -271,11 +287,102 @@ assert resource.getrlimit(resource.RLIMIT_CORE)[0] == 0
     def test_verification_diagnostics_require_completed_transport_and_are_not_reissued(self):
         gateway = self.gateway(self.envelope_source())
         with self.assertRaisesRegex(TeamError, "unique completed"):
-            self.store.record_exec_verification(self.job.id, {"execution_attested": True})
+            self.store.record_exec_verification(self.job.id, self.verification())
         gateway.execute(self.job, self.root, "hello")
-        self.store.record_exec_verification(self.job.id, {"execution_attested": False})
+        verification = self.verification()
+        self.store.record_exec_verification(self.job.id, verification)
+        verification.update(execution_attested=True, origin="github")
+        recorded = self.store.exec_calls(self.job.run_id)[0]["controller_verification"]
+        self.assertEqual(recorded, self.verification())
+        self.assertIs(recorded["execution_attested"], False)
         with self.assertRaisesRegex(TeamError, "unique completed"):
-            self.store.record_exec_verification(self.job.id, {"execution_attested": True})
+            self.store.record_exec_verification(self.job.id, self.verification())
+
+    def test_forged_diagnostics_do_not_write_records_or_events(self):
+        self.gateway(self.envelope_source()).execute(self.job, self.root, "hello")
+        before_calls = self.store.exec_calls(self.job.run_id)
+        before_events = self.store.events(self.job.run_id)
+        valid = self.verification()
+        malformed = [None, [], {"execution_attested": True}, valid | {"extra": "claim"}]
+
+        class UntrustedDiagnostics(dict):
+            pass
+
+        malformed.append(UntrustedDiagnostics(valid))
+        malformed.extend({k: v for k, v in valid.items() if k != missing} for missing in valid)
+        for name, values in (
+            ("execution_attested", (True, 0, None, "false", [])),
+            ("origin", ("github", "codex_cloud", None, True, [])),
+            ("source", ("agent:PASS", "controller:exec-result-validator-v2", None, True, {})),
+        ):
+            malformed.extend(valid | {name: value} for value in values)
+        for name in (
+            "head_sha",
+            "tree_sha",
+            "content_digest",
+            "inventory_digest",
+            "controller_inventory_digest",
+            "controller_checks_digest",
+            "patch_digest",
+            "payload_digest",
+            "source_patch_digest",
+        ):
+            for value in (
+                None,
+                True,
+                123,
+                [],
+                {},
+                b"a" * len(valid[name]),
+                "A" * len(valid[name]),
+                "g" * len(valid[name]),
+                valid[name][1:],
+                valid[name] + "\n",
+            ):
+                malformed.append(valid | {name: value})
+        for value in malformed:
+            with self.subTest(value=value), self.assertRaises(TeamError):
+                self.store.record_exec_verification(self.job.id, value)
+            self.assertEqual(self.store.exec_calls(self.job.run_id), before_calls)
+            self.assertEqual(self.store.events(self.job.run_id), before_events)
+        for job_id in (None, True, [], "x" * 64, "a" * 40):
+            with self.subTest(job_id=job_id), self.assertRaises(TeamError):
+                self.store.record_exec_verification(job_id, valid)
+        self.assertEqual(self.store.exec_calls(self.job.run_id), before_calls)
+        self.assertEqual(self.store.events(self.job.run_id), before_events)
+        self.store.record_exec_verification(self.job.id, valid)
+        self.assertEqual(
+            self.store.exec_calls(self.job.run_id)[0]["controller_verification"], valid
+        )
+
+    def test_diagnostics_must_match_the_simulated_transport_binding(self):
+        self.gateway(self.envelope_source()).execute(self.job, self.root, "hello")
+        before_events = self.store.events(self.job.run_id)
+        original = self.store.exec_calls(self.job.run_id)[0]
+        with self.assertRaisesRegex(TeamError, "simulated transport"):
+            self.store.record_exec_verification(
+                self.job.id, self.verification() | {"head_sha": "f" * 40}
+            )
+        for changes in (
+            {"simulated": False},
+            {"simulated": 1},
+            {"id": "f" * 64},
+            {"job": None},
+            {"job": {}},
+            {"state": "intent"},
+            {"state": "uncertain"},
+        ):
+            with self.subTest(changes=changes):
+                record = original | changes
+                with self.store.connect() as connection:
+                    connection.execute(
+                        "UPDATE exec_calls SET payload = ? WHERE id = ?",
+                        (json.dumps(record), self.job.id),
+                    )
+                with self.assertRaises(TeamError):
+                    self.store.record_exec_verification(self.job.id, self.verification())
+                self.assertEqual(self.store.exec_calls(self.job.run_id), [record])
+                self.assertEqual(self.store.events(self.job.run_id), before_events)
 
     def test_protected_patch_review_mutation_and_contradictory_pass_escalate(self):
         for mode, reason in (
