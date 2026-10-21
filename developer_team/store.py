@@ -248,7 +248,9 @@ class RunStore:
                     (record["id"], record["run_id"], json.dumps(record, sort_keys=True)),
                 )
             except sqlite3.IntegrityError as exc:
-                raise TeamError("Exec intent already exists; reconcile manually, never retry") from exc
+                raise TeamError(
+                    "Exec intent already exists; reconcile manually, never retry"
+                ) from exc
             connection.execute(
                 "INSERT INTO events(run_id, kind, payload) VALUES (?, 'exec:intent', ?)",
                 (record["run_id"], json.dumps(record, sort_keys=True)),

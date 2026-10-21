@@ -7,7 +7,15 @@ from dataclasses import asdict
 from pathlib import Path
 
 from ..authority import EvidenceAuthority, ProjectGrant, RuntimePolicy
-from ..models import Origin, PermissionDenied, PlatformSnapshot, PullRequest, Role, TeamError, digest
+from ..models import (
+    Origin,
+    PermissionDenied,
+    PlatformSnapshot,
+    PullRequest,
+    Role,
+    TeamError,
+    digest,
+)
 from .base import AgentContext
 from .cloud_contracts import CloudApproval, CloudJob, fields, text_value
 from .cloud_results import CloudResultImporter

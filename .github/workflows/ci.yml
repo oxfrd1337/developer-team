@@ -36,7 +36,7 @@ jobs:
       - name: Lint including security rules
         run: python -m ruff check developer_team tests
       - name: Check formatting
-        run: python -m ruff format --check developer_team tests
+        run: python -m ruff format --check --diff developer_team tests
       - name: Execute synthetic workflow and merge-safety tests
         run: python -m coverage run --branch -m unittest discover -s tests -t . -v
       - name: Report coverage

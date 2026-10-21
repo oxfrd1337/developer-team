@@ -138,10 +138,11 @@ class CodexExecGateway:
         self,
         store: RunStore,
         simulator: SimulatedExecProcess | None = None,
-        limits: ExecLimits = ExecLimits(),
+        limits: ExecLimits | None = None,
         *,
         now=time.time,
     ):
+        limits = limits if limits is not None else ExecLimits()
         limits.validate()
         self.store, self.simulator, self.limits, self.now = store, simulator, limits, now
         self.simulated = simulator is not None
