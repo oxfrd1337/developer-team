@@ -48,6 +48,12 @@ class PilotTests(unittest.TestCase):
         ]:
             if path.is_file() and "__pycache__" not in path.parts:
                 self.source.write(str(path.relative_to(REPOSITORY)), path.read_text())
+        # The rehearsal's initial acceptance must fail regardless of whether
+        # the real pilot_project/calculator.py has already been implemented.
+        self.source.write(
+            "pilot_project/calculator.py",
+            "def add(a, b):\n    raise NotImplementedError('Synthetic pilot bootstrap')\n",
+        )
         self.source.commit("Prepare artificial DT-003 fixture")
         self.session = self.root / "session"
         self.report = prepare_session(self.source.root, self.session)
@@ -60,6 +66,12 @@ class PilotTests(unittest.TestCase):
             saved,
             destination,
             **({"controller_sha": self.source.head, "run_id": self.run_id} | kwargs),
+        )
+
+    def test_bootstrap_fixture_is_independent_of_real_pilot_implementation(self):
+        self.assertIn(
+            "raise NotImplementedError",
+            self.source.read("pilot_project/calculator.py"),
         )
 
     def test_complete_rehearsal_uses_existing_engine_and_retains_manual_gate(self):
