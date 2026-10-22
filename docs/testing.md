@@ -131,3 +131,34 @@ Python-Prozessen als ausdrücklich simulierten CLI-Antworten. Es wird kein Codex
 oder Modellprozess gestartet. Budgets, Ressourcen-/Ausgabegrenzen, Abbruch,
 Ergebnisbindung, Reviewtrennung und Live-/Merge-Sperren sind in
 [dt-005.md](dt-005.md) beschrieben. Diese Tests attestieren keine OS-Isolation.
+
+## DT-007
+
+```sh
+python -m unittest tests.test_readiness tests.test_boundaries tests.test_exec -v
+python -m developer_team.readiness_probe > /tmp/dt007-probes.json
+# Erwarteter Exitcode 2: NO-GO, unabhängig von bestandenen Einzelprobes.
+```
+
+`test_readiness.py` prüft strikte Diagnose-/Bindungsschemas, Fake-PASS und fehlende
+unabhängige Attestierung, JSON-/SQLite-/Env-/Projekt-/CI-Claims ohne Popen,
+synthetische Brokeridentität und Replay, absolute Lease, atomaren Einmalintent,
+Journalfehler und unveränderte Reviewquellen einschließlich bewusst nachgewiesener
+Write-and-Restore-Lücke. Neue echte Hostprobes betreffen ausschließlich eigene
+Datei-/FD-/Env-Canaries, lokale DNS-/IPv4-/IPv6-/HTTP-/TCP-/UDP-/Unix-/Abstractziele
+sowie eigene synthetische Prozesse mit Controller-SIGKILL und Detached Child.
+Kein Modell wird aufgerufen. Fehlende Hostfunktionen bleiben UNSUPPORTED, ohne
+unsandboxierten Ersatzlauf als vermeintlichen Isolationsbeweis. Positive Kontrollen
+sind Voraussetzung für negative Zugriffsbelege. Der Prozessharness ist kein externer
+Supervisor. [DT-007](dt-007.md) trennt lokale Vertrags-PASS von Live-NO-GO;
+[Validierung](dt-007-validation.md) dokumentiert Befehle, Hashes und echte CI.
+
+
+DT-007-Reviewkorrektur: Die Prozessprobe übernimmt nur den vom eigenen Controller
+per SCM_RIGHTS übertragenen, während einer ungeernteten Child-Lebenszeit geöffneten
+pidfd. Negative Ownership-, Session-, Startzeit-, `/proc`-, FD-Bindungs-, frühe
+Ende-/PID-Reuse- und Transferfälle prüfen ausdrücklich, dass **kein**
+`pidfd_send_signal` und kein Controller-SIGKILL erfolgt und unbestätigte Handles
+nur geschlossen werden. Positive Vertrags- und echte eigene Prozessprobes prüfen
+den verifizierten Cleanup weiterhin. Ein fremder/unverifizierter Handle wird
+niemals als Cleanup-Fallback signalisiert. Live bleibt NO-GO.
