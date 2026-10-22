@@ -164,6 +164,14 @@ class CodexCloudGateway:
         approval: CloudApproval | None = None,
         job: CloudJob | None = None,
     ) -> CloudSubmission:
+        # DT-008: the observed provider has no supported remote cancel, independent
+        # role attestation or hard usage cap. Approval/JSON cannot supply these.
+        # Keep lifecycle contract tests available through injected model-free runners.
+        if self.runner is run_cli:
+            raise PermissionDenied(
+                "DT-008 NO-GO: real Cloud submission unsupported; "
+                "independent role controls and remote stop contract missing"
+            )
         environment = self._authorize(config, effective_digest, policy, grant, role, approval, job)
         if branch != job.branch or expected_sha != job.head_sha or branch == config.base_branch:
             raise PermissionDenied("Cloud branch or commit does not match the durable job")

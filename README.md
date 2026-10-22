@@ -1,5 +1,16 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
+## DT-008: erster echter Vier-Rollen-Pilot bleibt NO-GO
+
+Die Betriebswegprüfung bestätigt CLI 0.163.0 und bestehenden ChatGPT-Login, aber keinen
+unabhängig attestierten Cloud-Rollen-/Stoppvertrag. Echte Cloud-Submissions sind jetzt
+explizit gesperrt. Der lesende `python -m developer_team.preflight` liefert BLOCKED,
+Exitcode 2; er erteilt keine Freigabe. Einzige nächste Architekturentscheidung ist der
+administrierte externe Betriebsweg mit Kostenrahmen. Kein Agentenstart im DT-008-Auftrag.
+
+[Betriebsweg/Nachweise](docs/dt-008.md) · [Validierung](docs/dt-008-validation.md) ·
+[Schritt-für-Schritt-Betreiberanleitung](docs/dt-008-go-live.md).
+
 Modularer Python-Kern für Anforderung, Planung, Architektur, Entwicklung, Tests,
 unabhängigen QA- und Security-Review, Korrekturen und kontrollierte PR-Freigabe.
 Das Repository enthält **einen ausführbaren sicheren Testmodus**. Es ist noch kein

@@ -162,3 +162,10 @@ Ende-/PID-Reuse- und Transferfälle prüfen ausdrücklich, dass **kein**
 nur geschlossen werden. Positive Vertrags- und echte eigene Prozessprobes prüfen
 den verifizierten Cleanup weiterhin. Ein fremder/unverifizierter Handle wird
 niemals als Cleanup-Fallback signalisiert. Live bleibt NO-GO.
+# DT-008
+
+`python -m unittest tests.test_preflight -v` prüft Fake-GO/Stopclaims, fehlende
+Verbindung, falsche Basis/Scope, verbotene Freigabeparameter und reale Cloud-Startsperre
+vor Prozess-/Journal-/Refzugriff. `python -m developer_team.preflight` ist ein lesender
+BLOCKED/NO-GO-Trockenlauf (Exitcode 2). Bestehende Lifecycle- und Bindungsnegativtests
+bleiben unverändert aktiv; [Nachweise und Grenzen](dt-008-validation.md).
