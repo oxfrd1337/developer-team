@@ -15,6 +15,8 @@ Dieses Modul nutzt ausschließlich Python-Standardbibliothek und hat bewusst **k
 
 Die Eingabe besteht aus maximal 64 flachen Python-`dict`-Objekten. Jedes Ereignis benötigt exakt seine vorgegebene Feldmenge; Textwerte sind kompakte Kennungen, keine Modellprompts oder Provider-Token.
 
+Pro Ereignis sind höchstens vier Felder erlaubt. Diese Anzahl wird am exakt nativen `dict` vor jeder Schlüsseliteration, jedem Lookup und jeder Mengenbildung geprüft. Danach müssen sämtliche Schlüssel exakt native `str` sein; `str`-Unterklassen und andere Python-Schlüssel werden vor Schlüsselvergleichen, Hash-Lookups oder Mengenbildung abgewiesen. Benutzerdefinierte `__eq__`-/`__hash__`-Methoden werden dabei nicht aufgerufen. Der Ereignistyp muss ebenfalls exakt `str` sein und wird vor seinem Schema-Lookup auf höchstens 28 Zeichen begrenzt. Übergrößen und ungültige Schlüssel ergeben kontrolliert `BLOCKED`.
+
 | Ereignis | Benötigte Felder außer `type` | Bedeutung |
 | --- | --- | --- |
 | `intent_recorded` | `intent_id`, `idempotency_key` | Vom externen Betreiber/Controller vor jedem Sendeversuch dauerhaft dokumentierter Laufintent (hier nur nachgespielt) |
@@ -39,6 +41,8 @@ Das Schema ist ein **lokaler Reduktionsvertrag**, nicht das rohe API-/Webhook-JS
 - `SYNTHETIC_TERMINAL_OBSERVED`: lokal syntaktisch stimmige Terminalbehauptung. **Weder** ein extern verifizierter Turn noch eine API-, Sicherheits-, Kosten- oder Mergefreigabe; auch das Endereignis `failed` ergibt diesen strukturellen Replaystatus und wird gesondert als `terminal_kind_claimed` sichtbar.
 - Bei **allen** Ereignisfolgen sind `provider_verified`, `cancel_verified`, `billing_verified`, `live_authorized` und `merge_authorized` **konstant `false`**. Ohne unabhängigen Remote-Nachweis werden keine Berechtigungen erzeugt.
 - Maximal 64 Ereignisse, begrenzte Kennungen und ein Betrag-Feld als nichtnegative ganze Centzahl sind reine Ressourcen-/Schema-Schutzmaßnahmen. Es gibt keinen Datei-/FIFO-Reader. Es wird kein lokales Persistenzjournal erzeugt.
+
+Die Grenzen beschränken die zusätzliche Verarbeitung im Replay. Bereits vom Aufrufer erzeugte große Pythonobjekte können nicht rückwirkend speicherbegrenzt werden; auch beim vorherigen Erzeugen eines `dict` ausgeführte Schlüssel-Callbacks liegen außerhalb dieser Prüfung. Der Replay ist keine Sandbox für den aufrufenden Pythoncode; die Eingabe darf während der Prüfung nicht nebenläufig verändert werden. Exakte native Typprüfungen schützen auch die vorangestellten Listen-/Objektoperationen sowie Ereignistypen, Referenzen, Betreiberkennungen und Beträge vor benutzerdefinierten Methoden.
 
 ## Lokale Verwendung (synthetisch, kostenlos)
 
@@ -69,7 +73,7 @@ python -m unittest tests.test_agents_canary_replay -v
 python -m unittest discover -s tests -t . -v
 ```
 
-Die neuen Negativtests prüfen doppelte/unbekannte Submits, falsche ID-/Turnbindungen, nur angeforderten Abbruch, Idle ohne Terminalstatus, Terminalkonflikte, fingierte Rechte, Kostenfelder, unerwartete Nested Objects, zu große Eingaben und den Verzicht auf Netzwerk-/Shell-/Dateizugriff. GitHub-CI wird separat kontrolliert.
+Die neuen Negativtests prüfen doppelte/unbekannte Submits, falsche ID-/Turnbindungen, nur angeforderten Abbruch, Idle ohne Terminalstatus, Terminalkonflikte, fingierte Rechte, Kostenfelder, unerwartete Nested Objects, zu große Eingaben und den Verzicht auf Netzwerk-/Shell-/Dateizugriff. S1-Regressionen umfassen 4.096 und 65.536 Zusatzfelder sowie Ereignistypen mit 29, 4.096 und 65.536 Zeichen; überwachte Schema-/Mengenoperationen dürfen vor der Ablehnung nicht aufgerufen werden. S2-Regressionen ersetzen sämtliche Schema-Schlüssel durch `str`-Unterklassen, zählen Callbacks und aktivieren gezielt auslösende Vergleichs-/Hash-Exceptions. Weitere Typnegativtests decken Container, Werte und Betreiberkennungen ab. GitHub-CI wird separat kontrolliert.
 
 ## Konkreter nächster Schritt – neue Betreiberentscheidung nötig
 

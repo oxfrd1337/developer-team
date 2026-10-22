@@ -24,6 +24,8 @@ _FIELDS = {
     "agent.session.turn.cancelled": frozenset({"type", "session_id", "turn_id"}),
     "usage_observed": frozenset({"type", "session_id", "turn_id", "amount_usd_cents"}),
 }
+MAX_EVENT_FIELDS = max(len(fields) for fields in _FIELDS.values())
+MAX_EVENT_KIND_LENGTH = max(map(len, _FIELDS))
 _TERMINAL = frozenset(
     {
         "agent.session.turn.completed",
@@ -44,8 +46,14 @@ def _reference(value: object) -> bool:
 def _event(value: object) -> dict:
     if type(value) is not dict:
         raise InvalidCanaryTrace("invalid_event_object")
+    if len(value) > MAX_EVENT_FIELDS:
+        raise InvalidCanaryTrace("too_many_event_fields")
+    # Native dict iteration does not hash or compare keys; reject custom keys first.
+    for key in value:
+        if type(key) is not str:
+            raise InvalidCanaryTrace("invalid_event_key_type")
     kind = value.get("type")
-    if type(kind) is not str or kind not in _FIELDS:
+    if type(kind) is not str or len(kind) > MAX_EVENT_KIND_LENGTH or kind not in _FIELDS:
         raise InvalidCanaryTrace("unsupported_event_kind")
     if set(value) != _FIELDS[kind]:
         raise InvalidCanaryTrace("missing_or_extra_event_fields")

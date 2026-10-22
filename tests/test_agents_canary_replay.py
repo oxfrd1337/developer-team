@@ -2,7 +2,7 @@
 
 import copy
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from developer_team.agents_canary_replay import MAX_EVENTS, replay_canary_trace
 
@@ -28,6 +28,31 @@ def cycle():
         event("agent.session.turn.completed", session_id=SESSION, turn_id=TURN),
         event("usage_observed", session_id=SESSION, turn_id=TURN, amount_usd_cents=4),
     ]
+
+
+class CallbackString(str):
+    def __new__(cls, value):
+        instance = super().__new__(cls, value)
+        instance.calls = []
+        instance.raise_on = None
+        return instance
+
+    def _called(self, operation):
+        self.calls.append(operation)
+        if self.raise_on == operation:
+            raise RuntimeError(f"unexpected {operation} callback")
+
+    def __eq__(self, other):
+        self._called("eq")
+        return str.__eq__(self, other)
+
+    def __hash__(self):
+        self._called("hash")
+        return str.__hash__(self)
+
+    def __len__(self):
+        self._called("len")
+        return str.__len__(self)
 
 
 class CanaryReplayTests(unittest.TestCase):
@@ -278,6 +303,132 @@ class CanaryReplayTests(unittest.TestCase):
             file_open.assert_not_called()
             process.assert_not_called()
             network.assert_not_called()
+
+    def test_oversized_events_are_blocked_before_schema_operations(self):
+        for extra_fields in (4_096, 65_536):
+            with self.subTest(extra_fields=extra_fields):
+                raw = cycle()[0]
+                raw.update({f"extra_{index}": None for index in range(extra_fields)})
+                with (
+                    patch("developer_team.agents_canary_replay._FIELDS") as fields,
+                    patch(
+                        "developer_team.agents_canary_replay.set",
+                        side_effect=AssertionError("premature set construction"),
+                        create=True,
+                    ) as make_set,
+                ):
+                    fields.__contains__.side_effect = AssertionError("premature schema lookup")
+                    report = self.blocked([raw])
+                    self.assertEqual(report["reasons"], ["event_0:too_many_event_fields"])
+                    fields.__contains__.assert_not_called()
+                    fields.__getitem__.assert_not_called()
+                    make_set.assert_not_called()
+
+    def test_overlong_event_kinds_are_blocked_before_schema_operations(self):
+        for kind in ("agent.session.turn.completedx", "x" * 4_096, "x" * 65_536):
+            with self.subTest(length=len(kind)):
+                raw = cycle()[0]
+                raw["type"] = kind
+                with (
+                    patch("developer_team.agents_canary_replay._FIELDS") as fields,
+                    patch(
+                        "developer_team.agents_canary_replay.set",
+                        side_effect=AssertionError("premature set construction"),
+                        create=True,
+                    ) as make_set,
+                ):
+                    fields.__contains__.side_effect = AssertionError("premature schema lookup")
+                    report = self.blocked([raw])
+                    self.assertEqual(report["reasons"], ["event_0:unsupported_event_kind"])
+                    fields.__contains__.assert_not_called()
+                    fields.__getitem__.assert_not_called()
+                    make_set.assert_not_called()
+
+    def test_non_string_event_keys_are_blocked(self):
+        for key in (None, 42, b"type", ("type",), object()):
+            with self.subTest(key_type=type(key).__name__):
+                raw = cycle()[0]
+                raw[key] = True
+                report = self.blocked([raw])
+                self.assertEqual(report["reasons"], ["event_0:invalid_event_key_type"])
+
+    def test_all_string_subclass_keys_are_blocked_without_callbacks(self):
+        for position, raw in enumerate(cycle()):
+            for field in (*raw, "unexpected"):
+                with self.subTest(position=position, field=field):
+                    key = CallbackString(field)
+                    seq = cycle()
+                    seq[position] = {
+                        key if name == field else name: value for name, value in raw.items()
+                    }
+                    if field == "unexpected":
+                        seq[position][key] = None
+                        if len(raw) == 4:
+                            del seq[position]["amount_usd_cents"]
+                    key.calls.clear()  # Caller-side dict construction is outside validation.
+                    report = self.blocked(seq)
+                    self.assertEqual(report["reasons"], [f"event_{position}:invalid_event_key_type"])
+                    self.assertEqual(key.calls, [])
+
+    def test_explosive_key_callbacks_are_never_invoked(self):
+        for operation in ("eq", "hash"):
+            with self.subTest(operation=operation):
+                key = CallbackString("type")
+                raw = {key: "intent_recorded", **pins()}
+                key.raise_on = operation
+                with self.assertRaisesRegex(RuntimeError, f"unexpected {operation} callback"):
+                    if operation == "eq":
+                        _ = key == "type"
+                    else:
+                        hash(key)
+                key.calls.clear()
+                report = self.blocked([raw])
+                self.assertEqual(report["reasons"], ["event_0:invalid_event_key_type"])
+                self.assertEqual(key.calls, [])
+
+    def test_container_subclasses_are_blocked_without_callbacks(self):
+        callback = Mock(side_effect=RuntimeError("unexpected container callback"))
+
+        class CustomList(list):
+            __len__ = __iter__ = __getitem__ = callback
+
+        class CustomDict(dict):
+            __len__ = __iter__ = __getitem__ = get = items = callback
+
+        self.blocked(CustomList(cycle()))
+        self.blocked([CustomDict(cycle()[0])])
+        callback.assert_not_called()
+
+    def test_string_subclass_values_are_blocked_without_callbacks(self):
+        for position, raw in enumerate(cycle()):
+            for field, value in raw.items():
+                if type(value) is not str:
+                    continue
+                with self.subTest(position=position, field=field):
+                    seq = cycle()
+                    custom = CallbackString(value)
+                    custom.raise_on = "hash"
+                    seq[position][field] = custom
+                    self.blocked(seq)
+                    self.assertEqual(custom.calls, [])
+
+    def test_string_subclass_operator_pins_are_blocked_without_callbacks(self):
+        custom = CallbackString(INTENT)
+        custom.raise_on = "len"
+        self.blocked(cycle(), intent=custom)
+        self.blocked(cycle(), key=custom)
+        self.assertEqual(custom.calls, [])
+
+    def test_amount_subclasses_are_blocked_before_comparisons(self):
+        callback = Mock(side_effect=RuntimeError("unexpected amount comparison"))
+
+        class CustomAmount(int):
+            __le__ = __ge__ = callback
+
+        seq = cycle()
+        seq[4]["amount_usd_cents"] = CustomAmount(4)
+        self.blocked(seq)
+        callback.assert_not_called()
 
 
 if __name__ == "__main__":
