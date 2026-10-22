@@ -85,6 +85,7 @@ def replay_canary_trace(
     submit_attempts = 0
     unknown_submit = False
     cancel_requested = False
+    idle_seen = False
     usage_seen = False
 
     try:
@@ -134,8 +135,11 @@ def replay_canary_trace(
                     cancel_requested = True
                     stage = "cancel"
                 elif kind == "agent.session.idle":
+                    if idle_seen:
+                        raise InvalidCanaryTrace("duplicate_idle")
                     if stage not in {"session", "idle", "cancel", "terminal", "usage"}:
                         raise InvalidCanaryTrace("invalid_idle_order")
+                    idle_seen = True
                     # Idle may follow a terminal event; it never replaces that evidence.
                     if stage in {"session", "idle"}:
                         stage = "idle"

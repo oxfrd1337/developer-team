@@ -24,13 +24,15 @@ Pro Ereignis sind höchstens vier Felder erlaubt. Diese Anzahl wird am exakt nat
 | `submission_uncertain` | dieselben | Antwort unklar: **nicht** blind erneut senden; nur ursprünglichen Vorgang extern rekonstruieren |
 | `session_receipt` | `session_id`, `turn_id` | Behaupteter Sitzungs- und Turnbezug nach einem Submit |
 | `cancel_requested` | dieselben | Nur behauptete Abbruchanforderung, **kein** Nachweis der erfolgreichen Fernabschaltung |
-| `agent.session.idle` | dieselben | Idle vor einem Terminalereignis ist kein Abschlussbeleg; ein späteres Idle lässt ein bereits beobachtetes Terminalereignis unverändert |
+| `agent.session.idle` | dieselben | Höchstens einmal pro Turn; vor Terminal kein Abschlussbeleg, nach Terminal bleibt dessen Behauptung erhalten |
 | `agent.session.turn.completed` | dieselben | Behauptetes erfolgreiches Terminalereignis |
 | `agent.session.turn.failed` | dieselben | Behauptetes fehlgeschlagenes Terminalereignis |
 | `agent.session.turn.cancelled` | dieselben | Behauptetes abgebrochenes Terminalereignis; ohne Providerattestierung weiterhin unbestätigt |
 | `usage_observed` | dieselben plus `amount_usd_cents` | Nur normalisierte künstliche Kostenbehauptung nach Terminalevent; kein tatsächliches Abrechnungslimit oder Rechnungsbeleg |
 
 Das Schema ist ein **lokaler Reduktionsvertrag**, nicht das rohe API-/Webhook-JSON. Ereignisnamen orientieren sich an den offiziell dokumentierten Turns; `intent_recorded`, `session_receipt` und `usage_observed` sind **eigene, synthetische Normalisierungen**, keine behaupteten OpenAI-Webhooknamen. Ein späterer Adapter muss erst echte Providerobjekte und deren Herkunft extern überprüfen, bevor er sie abbildet.
+
+Ein zweites `agent.session.idle` für denselben Turn ergibt immer `BLOCKED`, auch wenn `cancel_requested`, ein Terminalereignis oder `usage_observed` zwischen den beiden Idle-Ereignissen liegt. Ein einzelnes Idle ohne Terminal bleibt `INCOMPLETE`; ein einzelnes Idle nach Terminal bleibt erlaubt und erhält `SYNTHETIC_TERMINAL_OBSERVED`. Cancel-, Terminal- und Usage-Ereignisse setzen die Idle-Dublettensperre nicht zurück.
 
 **Wichtig:** Der erwartete `intent_id` und `idempotency_key` müssen dem Replay unabhängig übergeben werden; sie dürfen nicht aus dem zu prüfenden Trace übernommen werden. API-Dokumentation empfiehlt für Folgeeingaben den gespeicherten `Idempotency-Key`-Header. Ein identischer Schlüssel beweist allein **keine** erfolgreiche einmalige Session-Erstellung und liefert keine echten Abbruchgarantien.
 

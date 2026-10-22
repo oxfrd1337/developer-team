@@ -237,6 +237,61 @@ class CanaryReplayTests(unittest.TestCase):
         self.assertEqual(report["status"], "SYNTHETIC_TERMINAL_OBSERVED")
         self.assertTrue(report["usage_claim_seen"])
 
+    def test_single_idle_after_each_terminal_kind_keeps_claim(self):
+        for outcome in ("completed", "failed", "cancelled"):
+            kind = f"agent.session.turn.{outcome}"
+            with self.subTest(kind=kind):
+                seq = cycle()[:3] + [
+                    event(kind, session_id=SESSION, turn_id=TURN),
+                    event("agent.session.idle", session_id=SESSION, turn_id=TURN),
+                ]
+                report = self.replay(seq)
+                self.assertEqual(report["status"], "SYNTHETIC_TERMINAL_OBSERVED")
+                self.assertEqual(report["terminal_kind_claimed"], kind)
+
+    def test_duplicate_idle_without_terminal_is_blocked(self):
+        idle = event("agent.session.idle", session_id=SESSION, turn_id=TURN)
+        cancel = event("cancel_requested", session_id=SESSION, turn_id=TURN)
+        for suffix in ([idle, dict(idle)], [cancel, idle, dict(idle)], [idle, cancel, dict(idle)]):
+            with self.subTest(events=[raw["type"] for raw in suffix]):
+                seq = cycle()[:3] + suffix
+                report = self.blocked(seq)
+                self.assertEqual(report["reasons"], [f"event_{len(seq) - 1}:duplicate_idle"])
+
+    def test_duplicate_idle_across_terminal_is_blocked(self):
+        idle = event("agent.session.idle", session_id=SESSION, turn_id=TURN)
+        cancel = event("cancel_requested", session_id=SESSION, turn_id=TURN)
+        for outcome in ("completed", "failed", "cancelled"):
+            terminal = event(f"agent.session.turn.{outcome}", session_id=SESSION, turn_id=TURN)
+            for suffix in (
+                [terminal, idle, dict(idle)],
+                [idle, terminal, dict(idle)],
+                [idle, cancel, terminal, dict(idle)],
+                [cancel, idle, terminal, dict(idle)],
+            ):
+                with self.subTest(events=[raw["type"] for raw in suffix]):
+                    seq = cycle()[:3] + suffix
+                    report = self.blocked(seq)
+                    self.assertEqual(report["reasons"], [f"event_{len(seq) - 1}:duplicate_idle"])
+
+    def test_duplicate_idle_across_usage_is_blocked(self):
+        idle = event("agent.session.idle", session_id=SESSION, turn_id=TURN)
+        cancel = event("cancel_requested", session_id=SESSION, turn_id=TURN)
+        usage = cycle()[4]
+        for outcome in ("completed", "failed", "cancelled"):
+            terminal = event(f"agent.session.turn.{outcome}", session_id=SESSION, turn_id=TURN)
+            for suffix in (
+                [terminal, usage, idle, dict(idle)],
+                [terminal, idle, usage, dict(idle)],
+                [idle, terminal, usage, dict(idle)],
+                [idle, cancel, terminal, usage, dict(idle)],
+                [cancel, idle, terminal, usage, dict(idle)],
+            ):
+                with self.subTest(events=[raw["type"] for raw in suffix]):
+                    seq = cycle()[:3] + suffix
+                    report = self.blocked(seq)
+                    self.assertEqual(report["reasons"], [f"event_{len(seq) - 1}:duplicate_idle"])
+
     def test_usage_before_terminal_is_blocked(self):
         self.blocked(cycle()[:3] + [cycle()[4], cycle()[3]])
 
