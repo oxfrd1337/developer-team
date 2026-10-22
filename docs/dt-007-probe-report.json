@@ -1,0 +1,147 @@
+{
+  "access": {
+    "abstract:denial": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "abstract:positive-control": {
+      "reason": "Own local listener reachable",
+      "status": "PASS"
+    },
+    "credential-positive-control": {
+      "reason": "Only artificial files/env/FD were reachable outside boundary",
+      "status": "PASS"
+    },
+    "credential:auth-file": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "credential:github-file": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "credential:home-file": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "credential:inherited-env": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "credential:inherited-fd": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "credential:ipc-file": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "credential:proxy-file": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "credential:refresh-file": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "dns:denial": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "dns:positive-control": {
+      "reason": "Own local listener reachable",
+      "status": "PASS"
+    },
+    "http:denial": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "http:positive-control": {
+      "reason": "Own local listener reachable",
+      "status": "PASS"
+    },
+    "ipv4-tcp:denial": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "ipv4-tcp:positive-control": {
+      "reason": "Own local listener reachable",
+      "status": "PASS"
+    },
+    "ipv4-udp:denial": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "ipv4-udp:positive-control": {
+      "reason": "Own local listener reachable",
+      "status": "PASS"
+    },
+    "ipv6-tcp:denial": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "ipv6-tcp:positive-control": {
+      "reason": "Own local listener reachable",
+      "status": "PASS"
+    },
+    "ipv6-udp:denial": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "ipv6-udp:positive-control": {
+      "reason": "Own local listener reachable",
+      "status": "PASS"
+    },
+    "namespace-prerequisite": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "unix:denial": {
+      "reason": "Namespace prerequisite unavailable: Namespace probe exit 1: bwrap: setting up uid map: Read-only file system",
+      "status": "UNSUPPORTED"
+    },
+    "unix:positive-control": {
+      "reason": "Own local listener reachable",
+      "status": "PASS"
+    }
+  },
+  "ai_calls": 0,
+  "collected_at": "2026-10-22T06:58:31.980162+00:00",
+  "decision": "NO-GO",
+  "diagnostic_only": true,
+  "host": {
+    "kernel": "6.18.55",
+    "system": "Linux",
+    "uid": 1000
+  },
+  "live_dispatch_authorized": false,
+  "schema_version": 1,
+  "scope": "current Codex worker; not historical Codespace or live attestation",
+  "source_sha256": "dbff7a15197f7af5b37cc09bcf5c1253fcb88c16986fe0d4b3edbfe8a501d53c",
+  "supervisor": {
+    "aggregate-enforcement": {
+      "reason": "Delegation and independent service not attested; writable indicator=False",
+      "status": "UNSUPPORTED"
+    },
+    "cgroup-v2": {
+      "reason": "Read-only filesystem capability inspection; no cgroup changes",
+      "status": "PASS"
+    },
+    "controller-sigkill-detached-child": {
+      "reason": "Synthetic detached child survived controller SIGKILL; demonstrates missing hard boundary",
+      "status": "PASS"
+    },
+    "external-cleanup": {
+      "reason": "No independent supervisor owns this run",
+      "status": "UNSUPPORTED"
+    },
+    "harness-cleanup": {
+      "reason": "Harness cleaned its synthetic child; NOT independent supervisor cleanup",
+      "status": "PASS"
+    },
+    "synthetic-runtime-exceeded": {
+      "reason": "Bounded direct synthetic process timed out and was reaped; no aggregate guarantee",
+      "status": "PASS"
+    }
+  }
+}

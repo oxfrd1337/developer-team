@@ -23,8 +23,16 @@ from uuid import uuid4
 from . import boundary_probe
 from .models import TeamError
 
-_DENIALS = (errno.EACCES, errno.EPERM, errno.ENETUNREACH, errno.EHOSTUNREACH,
-            errno.ECONNREFUSED, errno.ENOENT, errno.EROFS, errno.EBADF)
+_DENIALS = (
+    errno.EACCES,
+    errno.EPERM,
+    errno.ENETUNREACH,
+    errno.EHOSTUNREACH,
+    errno.ECONNREFUSED,
+    errno.ENOENT,
+    errno.EROFS,
+    errno.EBADF,
+)
 _NETWORK = r"""
 import json, socket, sys
 q=json.loads(sys.argv[1])
@@ -69,15 +77,21 @@ def _host_python(source, request, **kwargs):
     result = subprocess.run(
         [sys.executable, "-I", "-c", source, json.dumps(request)],
         env={"PATH": "/usr/bin:/bin", "DT007_FAKE_TOKEN": "synthetic-only"},
-        stdin=subprocess.DEVNULL, capture_output=True, timeout=5, check=True, **kwargs,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        timeout=5,
+        check=True,
+        **kwargs,
     )
     return json.loads(result.stdout)
 
 
 @contextlib.contextmanager
 def _listener(root, kind):
-    family = socket.AF_UNIX if kind in ("unix", "abstract") else (
-        socket.AF_INET6 if kind.startswith("ipv6") else socket.AF_INET
+    family = (
+        socket.AF_UNIX
+        if kind in ("unix", "abstract")
+        else (socket.AF_INET6 if kind.startswith("ipv6") else socket.AF_INET)
     )
     udp = kind in ("dns", "ipv4-udp", "ipv6-udp")
     socktype = socket.SOCK_DGRAM if udp else socket.SOCK_STREAM
@@ -118,10 +132,17 @@ def _listener(root, kind):
         message = (
             bytes.fromhex("0007010000010000000000000663616e61727907696e76616c69640000010001")
             if kind == "dns"
-            else b"GET / HTTP/1.0\r\n\r\n" if kind == "http" else b"DT007"
+            else b"GET / HTTP/1.0\r\n\r\n"
+            if kind == "http"
+            else b"DT007"
         )
-        yield {"family": int(family), "type": int(socktype), "address": bound,
-               "message": message.hex(), "denials": _DENIALS}
+        yield {
+            "family": int(family),
+            "type": int(socktype),
+            "address": bound,
+            "message": message.hex(),
+            "denials": _DENIALS,
+        }
     finally:
         stop.set()
         if thread is not None:
@@ -137,7 +158,9 @@ def _available(project):
         actual = boundary_probe._run(
             project,
             "import os,json;print(json.dumps({n:os.readlink('/proc/self/ns/'+n) for n in "
-            + repr(boundary_probe.NAMESPACES) + "}))", {},
+            + repr(boundary_probe.NAMESPACES)
+            + "}))",
+            {},
         )
         if set(actual) != set(host) or any(actual[n] == host[n] for n in host):
             raise TeamError("Namespaces not independent from controller")
@@ -153,11 +176,20 @@ def collect_access_probes():
         project = root / "project"
         project.mkdir()
         available, reason = _available(project)
-        observations["namespace-prerequisite"] = _result("PASS" if available else "UNSUPPORTED",
-            reason)
-        paths = {name: str(root / name) for name in (
-            "auth-file", "refresh-file", "github-file", "proxy-file", "home-file", "ipc-file",
-        )}
+        observations["namespace-prerequisite"] = _result(
+            "PASS" if available else "UNSUPPORTED", reason
+        )
+        paths = {
+            name: str(root / name)
+            for name in (
+                "auth-file",
+                "refresh-file",
+                "github-file",
+                "proxy-file",
+                "home-file",
+                "ipc-file",
+            )
+        }
         for path in paths.values():
             Path(path).write_text("DT007-synthetic-only")
         # Deliberately high synthetic descriptor, never inspect inherited real descriptors.
@@ -166,42 +198,47 @@ def collect_access_probes():
             try:
                 request = {"paths": paths, "fd": fd, "denials": _DENIALS}
                 control = _host_python(_CREDENTIAL, request, pass_fds=(fd,))
-                if set(control) != {*paths,
-                    "inherited-fd",
-                    "inherited-env"} or any(v["status"] != "FAIL" for v in control.values()):
+                if set(control) != {*paths, "inherited-fd", "inherited-env"} or any(
+                    v["status"] != "FAIL" for v in control.values()
+                ):
                     raise TeamError("Credential positive control failed")
-                observations["credential-positive-control"] = _result("PASS",
-                    "Only artificial files/env/FD were reachable outside boundary")
+                observations["credential-positive-control"] = _result(
+                    "PASS", "Only artificial files/env/FD were reachable outside boundary"
+                )
                 if available:
                     observed = boundary_probe._run(project, _CREDENTIAL, request)
                     for name in control:
-                        observations["credential:" + name] = observed.get(name,
-                            _result("UNSUPPORTED",
-                            "Missing result"))
+                        observations["credential:" + name] = observed.get(
+                            name, _result("UNSUPPORTED", "Missing result")
+                        )
                 else:
                     for name in control:
                         observations["credential:" + name] = _result("UNSUPPORTED", reason)
             finally:
                 os.close(fd)
-        for kind in ("dns",
+        for kind in (
+            "dns",
             "http",
             "ipv4-tcp",
             "ipv4-udp",
             "ipv6-tcp",
             "ipv6-udp",
             "unix",
-            "abstract"):
+            "abstract",
+        ):
             try:
                 with _listener(root, kind) as request:
                     before = _host_python(_NETWORK, request)
                     if before["status"] != "FAIL":
                         raise TeamError("Network positive control failed")
-                    observations[kind + ":positive-control"] = _result("PASS",
-                        "Own local listener reachable")
-                    observed = boundary_probe._run(project,
-                        _NETWORK,
-                        request) if available else _result("UNSUPPORTED",
-                        reason)
+                    observations[kind + ":positive-control"] = _result(
+                        "PASS", "Own local listener reachable"
+                    )
+                    observed = (
+                        boundary_probe._run(project, _NETWORK, request)
+                        if available
+                        else _result("UNSUPPORTED", reason)
+                    )
                     after = _host_python(_NETWORK, request)
                     if after["status"] != "FAIL":
                         raise TeamError("Listener disappeared during negative probe")
@@ -234,23 +271,30 @@ def collect_supervisor_probes():
     try:
         result["cgroup-v2"] = _result(
             "PASS" if (cgroup / "cgroup.controllers").is_file() else "UNSUPPORTED",
-            "Read-only filesystem capability inspection; no cgroup changes")
+            "Read-only filesystem capability inspection; no cgroup changes",
+        )
         delegated = os.access(cgroup / "cgroup.subtree_control", os.W_OK)
-        result["aggregate-enforcement"] = _result("UNSUPPORTED",
-            "Delegation and independent service not attested; writable indicator=" + str(delegated))
+        result["aggregate-enforcement"] = _result(
+            "UNSUPPORTED",
+            "Delegation and independent service not attested; writable indicator=" + str(delegated),
+        )
     except OSError as exc:
         result["aggregate-enforcement"] = _result("UNSUPPORTED", str(exc))
     result["external-cleanup"] = _result("UNSUPPORTED", "No independent supervisor owns this run")
     if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
-        result["controller-sigkill-detached-child"] = _result("UNSUPPORTED",
-            "Safe owned-process pidfd signaling unavailable")
+        result["controller-sigkill-detached-child"] = _result(
+            "UNSUPPORTED", "Safe owned-process pidfd signaling unavailable"
+        )
         return result
     # Only descendants created by this fixed synthetic controller are addressed.
     child_fd = None
     with subprocess.Popen(
         [sys.executable, "-I", "-c", _CONTROLLER],
-        env={"PATH": "/usr/bin:/bin"}, stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True,
+        env={"PATH": "/usr/bin:/bin"},
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
     ) as controller:
         try:
             if not select.select([controller.stdout], [], [], 3)[0]:
@@ -267,7 +311,8 @@ def collect_supervisor_probes():
             result["controller-sigkill-detached-child"] = _result(
                 "PASS" if survived else "UNSUPPORTED",
                 "Synthetic detached child survived controller SIGKILL; "
-                "demonstrates missing hard boundary")
+                "demonstrates missing hard boundary",
+            )
         except (OSError, ValueError, subprocess.SubprocessError, TeamError) as exc:
             result["controller-sigkill-detached-child"] = _result("UNSUPPORTED", str(exc))
         finally:
@@ -275,38 +320,48 @@ def collect_supervisor_probes():
                 with contextlib.suppress(ProcessLookupError):
                     signal.pidfd_send_signal(child_fd, signal.SIGKILL)
                 cleaned = bool(select.select([child_fd], [], [], 2)[0])
-                result["harness-cleanup"] = _result("PASS" if cleaned else "FAIL",
-                    "Harness cleaned its synthetic child; NOT independent supervisor cleanup")
+                result["harness-cleanup"] = _result(
+                    "PASS" if cleaned else "FAIL",
+                    "Harness cleaned its synthetic child; NOT independent supervisor cleanup",
+                )
                 os.close(child_fd)
             if controller.poll() is None:
                 controller.terminate()
                 controller.wait(timeout=2)
     try:
-        subprocess.run([sys.executable, "-I", "-c", "import time;time.sleep(8)"],
-                       env={"PATH": "/usr/bin:/bin"}, stdin=subprocess.DEVNULL,
-                       stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL,
-                           timeout=0.1,
-                           check=True)
+        subprocess.run(
+            [sys.executable, "-I", "-c", "import time;time.sleep(8)"],
+            env={"PATH": "/usr/bin:/bin"},
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=0.1,
+            check=True,
+        )
     except subprocess.TimeoutExpired:
-        result["synthetic-runtime-exceeded"] = _result("PASS",
-            "Bounded direct synthetic process timed out and was reaped; no aggregate guarantee")
+        result["synthetic-runtime-exceeded"] = _result(
+            "PASS",
+            "Bounded direct synthetic process timed out and was reaped; no aggregate guarantee",
+        )
     return result
 
 
 def collect_report():
     observations = {}
-    for name, collect in (("access",
-        collect_access_probes),
-        ("supervisor",
-        collect_supervisor_probes)):
+    for name, collect in (
+        ("access", collect_access_probes),
+        ("supervisor", collect_supervisor_probes),
+    ):
         try:
             observations[name] = collect()
         except (OSError, subprocess.SubprocessError, TeamError) as exc:
             observations[name] = {"collection": _result("UNSUPPORTED", str(exc))}
     return {
-        "schema_version": 1, "diagnostic_only": True, "decision": "NO-GO",
-        "live_dispatch_authorized": False, "ai_calls": 0,
+        "schema_version": 1,
+        "diagnostic_only": True,
+        "decision": "NO-GO",
+        "live_dispatch_authorized": False,
+        "ai_calls": 0,
         "scope": "current Codex worker; not historical Codespace or live attestation",
         "host": {"system": platform.system(), "kernel": platform.release(), "uid": os.getuid()},
         "source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),

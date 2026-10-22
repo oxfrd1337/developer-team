@@ -126,8 +126,7 @@ class ReviewSourceContract:
             raise TeamError("Review copies must be separate")
         seals = tuple(SnapshotSeal.capture(w, self.head_sha) for w in (qa, security))
         if any(
-            (s.tree_sha, s.content_digest) != (self.tree_sha, self.content_digest)
-            for s in seals
+            (s.tree_sha, s.content_digest) != (self.tree_sha, self.content_digest) for s in seals
         ):
             raise TeamError("Review source differs from controller binding")
         return seals

@@ -124,3 +124,21 @@ CI-Grün wäre weiterhin kein Host-, Credential-, Supervisor- oder Live-Nachweis
 unabhängige Attestierung bleiben UNSUPPORTED. Keine echten Agenten, Live-Freigabe,
 Käufe, Merges oder Deployments. Die konkrete nächste Betreiberentscheidung und
 Alternativen mit Rechte-/Kostenfolgen stehen in [DT-007](dt-007.md).
+
+## Gesicherte Worker-Diagnose und Quellhashes
+
+[Probebericht](dt-007-probe-report.json), erhoben `2026-10-22T06:58:31.980162+00:00`: **13 PASS / 19 UNSUPPORTED / 0 FAIL**, Gesamtentscheidung NO-GO, `ai_calls=0`.
+PASS umfasst nur positive Canaries und synthetische Prozessbeobachtungen, keine bestandene Live-Grenze. Der Bericht ist kein HostReadinessReport-Import und keine Autorität.
+
+| Quelle | SHA-256 |
+| --- | --- |
+| `developer_team/boundary_contracts.py` | `1ff3777827740b29fe9723107c4ffcb350249dadc1061c337daeb71f4153a996` |
+| `developer_team/host_readiness.py` | `505b1595099eaccaa7ffcd9bd51ccb1674f59aa45724a8a32e2c147f7e17bd3f` |
+| `developer_team/readiness_probe.py` | `dbff7a15197f7af5b37cc09bcf5c1253fcb88c16986fe0d4b3edbfe8a501d53c` |
+| `docs/dt-007-probe-report.json` | `85ab2d7800264d5ef4e898b8f4b6fb42179eda5e1e88259083d73d3b103d0299` |
+
+## CI-Zwischenstände
+
+[Run 39737020504](https://github.com/oxfrd1337/developer-team/actions/runs/39737020504), HEAD `b84f02a5e6a5c97c601ba0677eca1ce30f5a8976`: drei Qualitätsjobs scheiterten an zwei Ruff-Befunden (S105 für ausdrücklich künstliches Canaryliteral, UP031). Korrigiert durch neutrale Canaryvariable und f-String, keine Regelunterdrückung. Drei übrige Jobs erfolgreich.
+
+[Run 39737156705](https://github.com/oxfrd1337/developer-team/actions/runs/39737156705), HEAD `c878bff8551da7a09b92c7f5ab93e84b642e4fe7`: Lint erfolgreich, Qualitätsjobs stoppen am Ruff-Formatcheck. Den tatsächlichen Formatter-Diff übernommen; keine fachliche Teständerung. Drei übrige Jobs erfolgreich. Beide Läufe sind ausdrücklich keine vollständigen grünen Nachweise.
