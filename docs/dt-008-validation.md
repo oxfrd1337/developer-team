@@ -90,15 +90,15 @@ Python 3.11/3.12/3.13 jeweils Ruff inkl. Security, Format, vollständige Unittes
 Branch-Coverage >=80 %, Wheel/SDist und Smoke; dazu CLI-Leseprobe und zwei modellfreie
 Checkpoint-/Restorejobs. Kein eigener Liveworkflow oder Secret wird ergänzt.
 
-Lokale und entfernte endgültige Ergebnisse, Run-URLs und finaler Commit werden nach
-Ausführung im Draft-PR festgehalten. Der finale Commit kann nicht seinen eigenen SHA
+Lokale und entfernte endgültige Ergebnisse, Run-URLs und finaler Commit stehen im
+Draft-PR [#11](https://github.com/oxfrd1337/developer-team/pull/11). Der finale Commit kann nicht seinen eigenen SHA
 in seiner Datei enthalten: maßgeblich sind PR-HEAD plus Actions-API `head_sha`,
 bei PR-Mergecheckout zusätzlich dessen Eltern und Treevergleich. Ein späterer Commit
 benötigt einen neuen vollständigen CI-Lauf. Frühere Läufe dürfen nicht als dessen
-Nachweis gelten. Die CI-Dokumentation wird nach dem ersten Lauf um die konkreten
-historischen SHA-/Runreferenzen ergänzt; finaler Status bleibt im PR prüfbar.
+Nachweis gelten. Die konkreten historischen SHA-/Runreferenzen folgen unten;
+der abschließende Status bleibt im PR prüfbar.
 
-Lokal fehlen anfangs Ruff, Coverage und Build-Frontend sowie Python 3.11/3.13.
+Lokal fehlen Ruff, Coverage und Build-Frontend sowie Python 3.11.
 Diese werden nicht als lokal bestanden ausgegeben. Keine Checks oder Workflows wurden
 für eine grüne Anzeige abgeschwächt. Der vollständige GitHubnachweis bleibt erforderlich.
 
@@ -119,3 +119,44 @@ die drei Qualitätsjobs scheitern an genau einer 101-Zeichen-Zeile im neuen Pref
 (Ruff E501); CLI-Probe und beide Checkpoint-/Restorejobs bestehen. Die Zeile wurde
 verkürzt, zusätzlich die Testformatierung an den bestehenden Stil angepasst.
 Der nächste Lauf prüft wieder die vollständige unveränderte CI.
+
+## Erfolgreicher vollständiger Quellcode-Nachweis
+
+[Run 39747223045 / #26](https://github.com/oxfrd1337/developer-team/actions/runs/39747223045):
+**completed / success, alle 6 Jobs erfolgreich**, Actions-API
+`head_sha=330f1ee90127f1508da4de19cdfc2e83f0c99a8a`.
+
+| Job | Tests | Branch-Coverage | Weitere Prüfungen |
+| --- | --- | --- | --- |
+| [Python 3.11](https://github.com/oxfrd1337/developer-team/actions/runs/39747223045/job/119718598266) | 227: 226 PASS / 1 alter Host-Skip | 91 % | Ruff/Security, Format, Wheel/SDist, Konfiguration, Smoke PASS |
+| [Python 3.12](https://github.com/oxfrd1337/developer-team/actions/runs/39747223045/job/119718598296) | 227: 226 PASS / 1 alter Host-Skip | 91 % | alle PASS |
+| [Python 3.13](https://github.com/oxfrd1337/developer-team/actions/runs/39747223045/job/119718598300) | 227: 226 PASS / 1 alter Host-Skip | 91 % | alle PASS |
+
+Jeweils `All checks passed!`, `50 files already formatted`, 3137 Statements und
+898 Branches, Coverage 91 % >=80 %. Der einzige Skip ist
+`test_real_namespace_boundary_if_supported_by_host`: fehlendes Bubblewrap auf Actions,
+kein Isolations-PASS. CLI-Leseprobe und beide Checkpoint-/Restorejobs sind erfolgreich.
+
+Die unveränderte PR-CI prüfte GitHubs temporären Mergecheckout
+`4cbc2ce638f6d6883dd6cb65cdd4b74cbfc764cb`. Seine Eltern sind exakt die bestätigte
+main-Basis und obiger HEAD, sein Tree `1cc1e0be4ffe6ae7b2d2e7f84e5abb23d27651e5`
+ist identisch zum HEAD-Tree. Das ist **kein Merge des PR**.
+
+Erneuter lokaler Gesamtlauf unter **Python 3.12.14 und 3.13.5**: jeweils 227 Tests,
+225 PASS / derselbe unveränderte Socket-Host-ERROR / derselbe alte Host-Skip.
+Der Fehler ist eine echte Workerbeschränkung, keine erfolgreiche lokale Gesamtsuite.
+GitHub bestätigt denselben Socket-Test auf unterstütztem Actions-Host erfolgreich.
+Wheel und SDist wurden lokal mit dem vorhandenen Setuptools-Backend gebaut (ohne
+fehlendes Build-Frontend); alle Pythonquellen im Wheel byteidentisch zum Checkout.
+Separat entpackter Wheel-Smoke `test-fix` erfolgreich, erwarteter blocked-Abschluss.
+
+Echter lesender Preflight am **22.10.2026, 08:22:29 UTC (10:22:29 Berlin)**,
+sauberer Controller-HEAD `330f1ee90127f1508da4de19cdfc2e83f0c99a8a`, Basis wie oben,
+effektiver Configdigest
+`c35e4a0adfadd3a3946518f5f16897ed4f8ebb3badf7da316f75aa4cd794b496`:
+BLOCKED / NO-GO, awaiting-architecture-decision, NOT-GRANTED, real_submissions=0.
+Das Diagnosefenster ist mittlerweile abgelaufen und erteilt ohnehin keine Autorität.
+
+Nach diesem Nachweis wird ausschließlich diese Ergebnisdokumentation aktualisiert.
+Auch der resultierende finale PR-HEAD erhält erneut die **vollständige** unveränderte
+GitHub-CI; deren URL und exakter HEAD werden im PR-Abschluss festgehalten.
