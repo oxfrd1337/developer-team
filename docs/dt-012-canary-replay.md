@@ -30,7 +30,7 @@ Die Eingabe besteht aus maximal 64 flachen Python-`dict`-Objekten. Jedes Ereigni
 
 Das Schema ist ein **lokaler Reduktionsvertrag**, nicht das rohe API-/Webhook-JSON. Ereignisnamen orientieren sich an den offiziell dokumentierten Turns; `intent_recorded`, `session_receipt` und `usage_observed` sind **eigene, synthetische Normalisierungen**, keine behaupteten OpenAI-Webhooknamen. Ein späterer Adapter muss erst echte Providerobjekte und deren Herkunft extern überprüfen, bevor er sie abbildet.
 
-**Wichtig:** Der erwartete `intent_id` und `idempotency_key` müssen dem Replay unabhängig übergeben werden; sie dürfen nicht aus dem zu prüfenden Trace übernommen werden. API-Dokumentation empfiehlt für Folgeeingaben den gespeicherten `Idempotency-Key`-Header. Ein identischer Schlüssel beweist allein **keine** erfolgreiche einmalige Sesssion-Erstellung und liefert keine echten Abbruchgarantien.
+**Wichtig:** Der erwartete `intent_id` und `idempotency_key` müssen dem Replay unabhängig übergeben werden; sie dürfen nicht aus dem zu prüfenden Trace übernommen werden. API-Dokumentation empfiehlt für Folgeeingaben den gespeicherten `Idempotency-Key`-Header. Ein identischer Schlüssel beweist allein **keine** erfolgreiche einmalige Session-Erstellung und liefert keine echten Abbruchgarantien.
 
 ## Ausgaben und Grenzen
 

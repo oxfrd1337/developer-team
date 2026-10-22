@@ -66,7 +66,9 @@ class CanaryReplayTests(unittest.TestCase):
                 self.blocked(value)
 
     def test_rejects_event_count_above_bound(self):
-        self.blocked([event("agent.session.idle", session_id=SESSION, turn_id=TURN)] * (MAX_EVENTS + 1))
+        self.blocked(
+            [event("agent.session.idle", session_id=SESSION, turn_id=TURN)] * (MAX_EVENTS + 1)
+        )
 
     def test_intent_only_is_incomplete(self):
         report = self.replay([cycle()[0]])
