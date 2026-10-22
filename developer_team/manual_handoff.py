@@ -8,8 +8,16 @@ import re
 from pathlib import Path
 
 SECURITY_CHECKS = frozenset(
-    {"secrets", "permissions", "dependencies", "deployment", "role_isolation",
-     "remote_stop", "budgets", "branch_protection"}
+    {
+        "secrets",
+        "permissions",
+        "dependencies",
+        "deployment",
+        "role_isolation",
+        "remote_stop",
+        "budgets",
+        "branch_protection",
+    }
 )
 BINDING_FIELDS = {"repo", "issue", "branch", "base_sha", "pr", "head_sha"}
 
@@ -77,8 +85,22 @@ def check_handoff(data: object, *, expected: dict, allowed_files: list[str]) -> 
     try:
         pins = _binding(expected)
         allowed = _paths(allowed_files)
-        item = _object(data, {"version", "binding", "allowed_files", "changed_files", "developer",
-                              "ci", "qa", "security", "risks", "unknown_checks", "blockers"})
+        item = _object(
+            data,
+            {
+                "version",
+                "binding",
+                "allowed_files",
+                "changed_files",
+                "developer",
+                "ci",
+                "qa",
+                "security",
+                "risks",
+                "unknown_checks",
+                "blockers",
+            },
+        )
         if type(item["version"]) is not int or item["version"] != 1:
             raise InvalidHandoff("unsupported_version")
         if _binding(item["binding"]) != pins:
@@ -133,8 +155,12 @@ def check_handoff(data: object, *, expected: dict, allowed_files: list[str]) -> 
         "merge_authorized": False,
         "cloud_authorized": False,
         "provenance_verified": False,
-        "limitations": ["offline_claims_only", "commit_existence_unverified",
-                        "live_ci_and_scope_unverified", "role_attestation_unverified"],
+        "limitations": [
+            "offline_claims_only",
+            "commit_existence_unverified",
+            "live_ci_and_scope_unverified",
+            "role_attestation_unverified",
+        ],
     }
 
 

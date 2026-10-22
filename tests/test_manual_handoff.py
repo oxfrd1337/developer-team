@@ -20,21 +20,36 @@ from developer_team.manual_handoff import (
 
 def fixture():
     binding = {
-        "repo": "synthetic/manual", "issue": 15, "branch": "dt-010/example",
-        "base_sha": "a" * 40, "pr": 16, "head_sha": "b" * 40,
+        "repo": "synthetic/manual",
+        "issue": 15,
+        "branch": "dt-010/example",
+        "base_sha": "a" * 40,
+        "pr": 16,
+        "head_sha": "b" * 40,
     }
     result = {"status": "PASS", "evidence": "synthetic evidence; not an attestation"}
     data = {
-        "version": 1, "binding": binding, "allowed_files": ["src/example.py"],
-        "changed_files": ["src/example.py"], "developer": "synthetic-dev",
-        "ci": {"binding": copy.deepcopy(binding),
-               "run_url": "https://github.com/synthetic/manual/actions/runs/123",
-               "jobs": {"tests": copy.deepcopy(result)}},
-        "risks": [], "unknown_checks": [], "blockers": [],
+        "version": 1,
+        "binding": binding,
+        "allowed_files": ["src/example.py"],
+        "changed_files": ["src/example.py"],
+        "developer": "synthetic-dev",
+        "ci": {
+            "binding": copy.deepcopy(binding),
+            "run_url": "https://github.com/synthetic/manual/actions/runs/123",
+            "jobs": {"tests": copy.deepcopy(result)},
+        },
+        "risks": [],
+        "unknown_checks": [],
+        "blockers": [],
     }
     for role in ("qa", "security"):
-        data[role] = {"binding": copy.deepcopy(binding), "reviewer": f"synthetic-{role}",
-                      "task_ref": f"synthetic-task-{role}", **copy.deepcopy(result)}
+        data[role] = {
+            "binding": copy.deepcopy(binding),
+            "reviewer": f"synthetic-{role}",
+            "task_ref": f"synthetic-task-{role}",
+            **copy.deepcopy(result),
+        }
     data["security"]["checks"] = {key: copy.deepcopy(result) for key in SECURITY_CHECKS}
     return data, copy.deepcopy(binding), ["src/example.py"]
 
@@ -60,8 +75,14 @@ class ManualHandoffTests(unittest.TestCase):
         self.assertIn("commit_existence_unverified", self.check()["limitations"])
 
     def test_wrong_repository_issue_branch_pr_base_or_head(self):
-        for key, value in (("repo", "attacker/repo"), ("issue", 99), ("branch", "other"),
-                           ("pr", 99), ("base_sha", "c" * 40), ("head_sha", "d" * 40)):
+        for key, value in (
+            ("repo", "attacker/repo"),
+            ("issue", 99),
+            ("branch", "other"),
+            ("pr", 99),
+            ("base_sha", "c" * 40),
+            ("head_sha", "d" * 40),
+        ):
             with self.subTest(key=key):
                 data = copy.deepcopy(self.data)
                 data["binding"][key] = value
@@ -93,14 +114,26 @@ class ManualHandoffTests(unittest.TestCase):
         self.pins["head_sha"] = self.data["binding"]["head_sha"] = "e" * 40
         report = self.check()
         self.assertEqual(report["status"], "BLOCKED")
-        self.assertTrue({"stale_ci", "stale_review:qa", "stale_review:security"}
-                        <= set(report["reasons"]))
+        self.assertTrue(
+            {"stale_ci", "stale_review:qa", "stale_review:security"} <= set(report["reasons"])
+        )
         self.data["qa"]["binding"]["head_sha"] = "e" * 40
         self.blocked()
 
     def test_scopes_traversal_globs_and_command_injection(self):
-        for path in ("../README.md", "/absolute/file", "src/../file", "src//file", "src/./file",
-                     ".git/config", "src\\file", "src/*", "$(touch hacked)", "`id`", "a\nb"):
+        for path in (
+            "../README.md",
+            "/absolute/file",
+            "src/../file",
+            "src//file",
+            "src/./file",
+            ".git/config",
+            "src\\file",
+            "src/*",
+            "$(touch hacked)",
+            "`id`",
+            "a\nb",
+        ):
             with self.subTest(path=path):
                 for key in ("allowed_files", "changed_files"):
                     data = copy.deepcopy(self.data)
@@ -139,9 +172,12 @@ class ManualHandoffTests(unittest.TestCase):
 
     def test_security_overall_pass_cannot_hide_incomplete_checks(self):
         for check in SECURITY_CHECKS:
-            for value in ({"status": "UNSUPPORTED", "evidence": "not readable"},
-                          {"status": "FAIL", "evidence": "violation"},
-                          {"status": "PASS", "evidence": ""}, {}):
+            for value in (
+                {"status": "UNSUPPORTED", "evidence": "not readable"},
+                {"status": "FAIL", "evidence": "violation"},
+                {"status": "PASS", "evidence": ""},
+                {},
+            ):
                 data = copy.deepcopy(self.data)
                 data["security"]["checks"][check] = value
                 self.blocked(data)
@@ -154,8 +190,12 @@ class ManualHandoffTests(unittest.TestCase):
             data = copy.deepcopy(self.data)
             data["ci"]["jobs"] = value
             self.blocked(data)
-        for value in ("", None, "https://github.com/attacker/repo/actions/runs/123",
-                      "https://github.com/synthetic/manual/actions/runs/123?fake=1"):
+        for value in (
+            "",
+            None,
+            "https://github.com/attacker/repo/actions/runs/123",
+            "https://github.com/synthetic/manual/actions/runs/123?fake=1",
+        ):
             data = copy.deepcopy(self.data)
             data["ci"]["run_url"] = value
             self.blocked(data)
@@ -217,8 +257,11 @@ class ManualHandoffTests(unittest.TestCase):
             args = [str(path), "--allowed-file", self.allowed[0]]
             for key, value in self.pins.items():
                 args.extend(["--" + key.replace("_", "-"), str(value)])
-            with (patch("subprocess.Popen") as process, patch("socket.socket") as network,
-                  patch("urllib.request.urlopen") as urlopen):
+            with (
+                patch("subprocess.Popen") as process,
+                patch("socket.socket") as network,
+                patch("urllib.request.urlopen") as urlopen,
+            ):
                 for raw in (json.dumps(self.data), '{"merge_authorized":true}', "invalid JSON"):
                     path.write_text(raw)
                     output = io.StringIO()
