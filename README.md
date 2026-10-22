@@ -1,5 +1,11 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
+## DT-011 V0: Betriebsweg zu kontrollierter Automatisierung (nur Design)
+
+[Vergleich Agents API, bestehender Codex Cloud und Codex SDK/app-server](docs/dt-011-provider-path.md)
+mit einem später separat zu genehmigenden rein synthetischen API-Canary.
+**Keine API-Aufrufe, Kosten, Agentenstarts oder neue Berechtigungen; produktives Live bleibt NO-GO.**
+
 ## DT-010 V0.1: manuell beaufsichtigte Übergaben
 
 [Deutsche Bedienungsanleitung mit vier Prompt-Vorlagen](docs/dt-010-manual-workflow.md)
