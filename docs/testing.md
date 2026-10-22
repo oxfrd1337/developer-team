@@ -152,3 +152,13 @@ unsandboxierten Ersatzlauf als vermeintlichen Isolationsbeweis. Positive Kontrol
 sind Voraussetzung für negative Zugriffsbelege. Der Prozessharness ist kein externer
 Supervisor. [DT-007](dt-007.md) trennt lokale Vertrags-PASS von Live-NO-GO;
 [Validierung](dt-007-validation.md) dokumentiert Befehle, Hashes und echte CI.
+
+
+DT-007-Reviewkorrektur: Die Prozessprobe übernimmt nur den vom eigenen Controller
+per SCM_RIGHTS übertragenen, während einer ungeernteten Child-Lebenszeit geöffneten
+pidfd. Negative Ownership-, Session-, Startzeit-, `/proc`-, FD-Bindungs-, frühe
+Ende-/PID-Reuse- und Transferfälle prüfen ausdrücklich, dass **kein**
+`pidfd_send_signal` und kein Controller-SIGKILL erfolgt und unbestätigte Handles
+nur geschlossen werden. Positive Vertrags- und echte eigene Prozessprobes prüfen
+den verifizierten Cleanup weiterhin. Ein fremder/unverifizierter Handle wird
+niemals als Cleanup-Fallback signalisiert. Live bleibt NO-GO.

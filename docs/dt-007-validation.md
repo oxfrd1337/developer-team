@@ -62,11 +62,11 @@ verändert. Delegation und externer Supervisor bleiben UNSUPPORTED.
 ## Lokale Ergebnisse und Grenzen
 
 Die vollständige Suite wurde unter beiden verfügbaren Pythonversionen ausgeführt:
-**217 Tests, kein Fehler, jeweils ein expliziter historischer Host-Skip**.
+**222 Tests (221 PASS / 1 expliziter historischer Host-Skip), kein Fehler**.
 Der unveränderte Test `test_real_namespace_boundary_if_supported_by_host` überspringt
 wegen nicht bereitstellbarer Namespaces. Das ist keine bestandene Isolationsprüfung.
 Die neuen Hostprobes verwenden UNSUPPORTED-Beobachtungen statt Skip=PASS.
-Die 14 neuen DT-007-Testmethoden enthalten zusätzlich zahlreiche parametrisierte
+Die jetzt 19 DT-007-Testmethoden enthalten zusätzlich zahlreiche parametrisierte
 Negativfälle und konkurrierende Reservierungen; diese Fallzahl ist keine Testzahl.
 
 Ein erster Lauf ohne Socketrechte scheiterte im bestehenden DT-006-Positivkontrolltest
@@ -127,18 +127,62 @@ Alternativen mit Rechte-/Kostenfolgen stehen in [DT-007](dt-007.md).
 
 ## Gesicherte Worker-Diagnose und Quellhashes
 
-[Probebericht](dt-007-probe-report.json), erhoben `2026-10-22T06:58:31.980162+00:00`: **13 PASS / 19 UNSUPPORTED / 0 FAIL**, Gesamtentscheidung NO-GO, `ai_calls=0`.
+[Probebericht](dt-007-probe-report.json), erhoben `2026-10-22T07:46:18.271590+00:00`: **13 PASS / 19 UNSUPPORTED / 0 FAIL**, Gesamtentscheidung NO-GO, `ai_calls=0`.
 PASS umfasst nur positive Canaries und synthetische Prozessbeobachtungen, keine bestandene Live-Grenze. Der Bericht ist kein HostReadinessReport-Import und keine Autorität.
 
 | Quelle | SHA-256 |
 | --- | --- |
 | `developer_team/boundary_contracts.py` | `1ff3777827740b29fe9723107c4ffcb350249dadc1061c337daeb71f4153a996` |
 | `developer_team/host_readiness.py` | `505b1595099eaccaa7ffcd9bd51ccb1674f59aa45724a8a32e2c147f7e17bd3f` |
-| `developer_team/readiness_probe.py` | `dbff7a15197f7af5b37cc09bcf5c1253fcb88c16986fe0d4b3edbfe8a501d53c` |
-| `docs/dt-007-probe-report.json` | `85ab2d7800264d5ef4e898b8f4b6fb42179eda5e1e88259083d73d3b103d0299` |
+| `developer_team/readiness_probe.py` | `ca9dd15acb13ff1bcab4c9383cf9e5fe253b28e5d11998e148fcfc6a533b1aeb` |
+| `docs/dt-007-probe-report.json` | `914846b81ab0670cdcca13ee4e5fec46c1b991968181f7060d5b8add9a031241` |
 
 ## CI-Zwischenstände
 
 [Run 39737020504](https://github.com/oxfrd1337/developer-team/actions/runs/39737020504), HEAD `b84f02a5e6a5c97c601ba0677eca1ce30f5a8976`: drei Qualitätsjobs scheiterten an zwei Ruff-Befunden (S105 für ausdrücklich künstliches Canaryliteral, UP031). Korrigiert durch neutrale Canaryvariable und f-String, keine Regelunterdrückung. Drei übrige Jobs erfolgreich.
 
 [Run 39737156705](https://github.com/oxfrd1337/developer-team/actions/runs/39737156705), HEAD `c878bff8551da7a09b92c7f5ab93e84b642e4fe7`: Lint erfolgreich, Qualitätsjobs stoppen am Ruff-Formatcheck. Den tatsächlichen Formatter-Diff übernommen; keine fachliche Teständerung. Drei übrige Jobs erfolgreich. Beide Läufe sind ausdrücklich keine vollständigen grünen Nachweise.
+
+## Reviewkorrektur: stabile Prozessidentität vor SIGKILL
+
+Ausgangspunkt dieses Reviews ist PR-HEAD
+`8e1f02dd2016406c5fa24346f3c3eadbfba7a00f` und der
+[Review vom 22.10.2026](https://github.com/oxfrd1337/developer-team/pull/9#pullrequestreview-5610658818)
+einschließlich [Inlinekommentar](https://github.com/oxfrd1337/developer-team/pull/9#discussion_r4345646358).
+Der ursprüngliche `finally`-Pfad konnte einen unverifizierten pidfd signalisieren;
+der zuvor dokumentierte Cleanup war für diesen Fehlerfall nicht sicher.
+
+Jetzt öffnet ausschließlich der synthetische Controller den pidfd seines eigenen,
+noch nicht abgeholten `Popen`-Kindes. Er überträgt den kernelgebundenen Handle per
+SCM_RIGHTS über ein nur an diesen Controller vererbtes Socketpaar. Der Harness
+öffnet keinen Prozess anhand einer gemeldeten PID. Vor SIGKILL bindet er Startzeit,
+Parent, Session, Zustand, FD-PID, Liveness und lebenden Controller; erst danach
+setzt er die Cleanup-Berechtigung für diesen eigenen Handle. Unbestätigte Handles
+werden nur geschlossen und bleiben UNSUPPORTED. Kein Signal-/Blind-Kill-Fallback.
+
+Zusätzliche modellfreie Tests:
+
+```sh
+python -m unittest tests.test_readiness.SupervisorIdentityTests -v
+python -m unittest tests.test_readiness -v
+python -m unittest discover -s tests -t . -v
+/usr/bin/python3.13 -m unittest discover -s tests -t . -v
+python -m developer_team.readiness_probe > docs/dt-007-probe-report.json
+```
+
+Fünf neue Testmethoden prüfen insgesamt 28 parametrisierte Negativvarianten sowie
+positive Vertrags-/eigene Prozessläufe: falsche Parent-/Session-/Prozess-ID,
+unpassende bzw. wechselnde Startzeit (PID-Reuse-Simulation), Zombie/Endzustand,
+fehlende, ungültige oder zwischenzeitlich verschwundene `/proc`-Daten, falsche,
+fehlende oder mehrdeutige FD-PID, lebend gemeldeten bereits beendeten pidfd,
+Controllerverlust und fehlschlagende Sessionabfrage. Ungültige, mehrdeutige und
+trunkierte SCM_RIGHTS-/JSON-Übertragungen schließen alle empfangenen Handles.
+Für unverifizierte Ziele ist `pidfd_send_signal.assert_not_called()` Pflicht;
+zusätzlich werden FD-Schließen und ausbleibender Controller-SIGKILL geprüft.
+
+Der echte eigene Child-Lauf bestätigt weiterhin Überleben nach Controller-SIGKILL
+und anschließenden verifizierten Harness-Cleanup. Externe Supervisorgrenze und
+alle übrigen Live-Kontrollen bleiben UNSUPPORTED / NO-GO. Der erneuerte Probebericht
+oben bindet exakt den aktuellen Probequellhash. Die bisherigen CI-Läufe sind nur
+historische Nachweise; der neue HEAD, alle sechs Jobs und deren echte Ergebnisse
+werden in der aktualisierten Beschreibung desselben Draft-PR #9 festgehalten.

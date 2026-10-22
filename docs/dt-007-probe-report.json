@@ -106,7 +106,7 @@
     }
   },
   "ai_calls": 0,
-  "collected_at": "2026-10-22T06:58:31.980162+00:00",
+  "collected_at": "2026-10-22T07:46:18.271590+00:00",
   "decision": "NO-GO",
   "diagnostic_only": true,
   "host": {
@@ -117,7 +117,7 @@
   "live_dispatch_authorized": false,
   "schema_version": 1,
   "scope": "current Codex worker; not historical Codespace or live attestation",
-  "source_sha256": "dbff7a15197f7af5b37cc09bcf5c1253fcb88c16986fe0d4b3edbfe8a501d53c",
+  "source_sha256": "ca9dd15acb13ff1bcab4c9383cf9e5fe253b28e5d11998e148fcfc6a533b1aeb",
   "supervisor": {
     "aggregate-enforcement": {
       "reason": "Delegation and independent service not attested; writable indicator=False",
@@ -136,7 +136,7 @@
       "status": "UNSUPPORTED"
     },
     "harness-cleanup": {
-      "reason": "Harness cleaned its synthetic child; NOT independent supervisor cleanup",
+      "reason": "Verified synthetic child cleanup; not an external supervisor",
       "status": "PASS"
     },
     "synthetic-runtime-exceeded": {

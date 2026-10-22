@@ -1,17 +1,19 @@
 """DT-007: hostile diagnostic inputs never grant execution authority."""
 
+import array
 import contextlib
 import copy
 import io
 import json
 import os
 import socket
+import subprocess
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, replace
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 from developer_team import readiness_probe as probe
@@ -359,10 +361,8 @@ class ReadinessProbeTests(unittest.TestCase):
         ):
             report = probe.collect_access_probes()
         self.assertEqual(report["ipv6-tcp:denial"]["status"], "UNSUPPORTED")
-        with patch.object(probe.os, "pidfd_open", new=None):
-            # Feature detection uses presence, so simulate a safe runtime refusal.
-            with patch.object(probe.os, "pidfd_open", side_effect=OSError("pidfd blocked")):
-                report = probe.collect_supervisor_probes()
+        with patch.object(probe, "_receive_child", side_effect=OSError("pidfd transfer blocked")):
+            report = probe.collect_supervisor_probes()
         self.assertEqual(report["controller-sigkill-detached-child"]["status"], "UNSUPPORTED")
 
     def test_main_is_unconditionally_no_go(self):
@@ -371,3 +371,169 @@ class ReadinessProbeTests(unittest.TestCase):
             contextlib.redirect_stdout(io.StringIO()),
         ):
             self.assertEqual(probe.main(), 2)
+
+
+class SupervisorIdentityTests(unittest.TestCase):
+    controller_pid = 41001
+    child_pid = 41002
+    child_fd = 123
+    start_ticks = 123456
+
+    def process_stat(self, *, pid=None, parent=None, session=None, started=None, state="S"):
+        fields = [
+            state,
+            str(self.controller_pid if parent is None else parent),
+            "0",
+            str(self.child_pid if session is None else session),
+            *(["0"] * 15),
+            str(self.start_ticks if started is None else started),
+        ]
+        pid = self.child_pid if pid is None else pid
+        return f"{pid} (synthetic (child)) " + " ".join(fields)
+
+    @contextlib.contextmanager
+    def harness(self, *, stat=None, fdinfo=None, message=None, ready=False, sid=None):
+        controller, receiver, sender = MagicMock(), MagicMock(), MagicMock()
+        controller.pid = self.controller_pid
+        controller.poll.return_value = None
+        sender.fileno.return_value = 41
+        if message is None:
+            message = {
+                "pid": self.child_pid,
+                "controller_pid": self.controller_pid,
+                "start_ticks": self.start_ticks,
+            }
+        stat = [self.process_stat(), self.process_stat()] if stat is None else stat
+        snapshots = iter(stat) if isinstance(stat, list) else None
+
+        def read(path, *args, **kwargs):
+            if str(path) == f"/proc/{self.child_pid}/stat":
+                value = next(snapshots) if snapshots is not None else stat
+                if isinstance(value, Exception):
+                    raise value
+                return value
+            if str(path) == f"/proc/self/fdinfo/{self.child_fd}":
+                return f"Pid:\t{self.child_pid}\n" if fdinfo is None else fdinfo
+            raise AssertionError(f"Unexpected metadata read: {path}")
+
+        def select_owned(readers, *args):
+            self.assertEqual(readers, [self.child_fd])
+            # After controller SIGKILL: first liveness, then confirmed harness cleanup.
+            signaled = kill.call_count > 0
+            return ([self.child_fd] if ready or signaled else [], [], [])
+
+        def killed():
+            controller.poll.return_value = -9
+
+        controller.kill.side_effect = killed
+        with (
+            patch.object(probe.socket, "socketpair", return_value=(receiver, sender)),
+            patch.object(probe.subprocess, "Popen") as popen,
+            patch.object(probe.subprocess, "run", side_effect=subprocess.TimeoutExpired([], 0.1)),
+            patch.object(probe, "_receive_child", return_value=(self.child_fd, message)),
+            patch.object(probe.Path, "read_text", autospec=True, side_effect=read),
+            patch.object(probe.os, "getsid", return_value=self.child_pid if sid is None else sid),
+            patch.object(probe.os, "close") as close,
+            patch.object(probe.os, "pidfd_open") as reopen,
+            patch.object(probe.signal, "pidfd_send_signal") as kill,
+            patch.object(probe.select, "select", side_effect=select_owned),
+        ):
+            popen.return_value.__enter__.return_value = controller
+            yield controller, close, reopen, kill
+
+    def test_unverified_identity_never_receives_sigkill_and_handle_is_closed(self):
+        cases = (
+            {"stat": self.process_stat(parent=999)},
+            {"stat": self.process_stat(session=999)},
+            {"stat": self.process_stat(pid=999)},
+            {"stat": self.process_stat(started=self.start_ticks + 1)},
+            {"stat": [self.process_stat(), self.process_stat(started=self.start_ticks + 1)]},
+            {"stat": self.process_stat(state="Z")},
+            {"stat": self.process_stat(state="X")},
+            {"stat": "invalid /proc data"},
+            {"stat": "41002 (child) S missing-fields"},
+            {"stat": OSError("synthetic /proc unavailable")},
+            {"stat": [self.process_stat(), OSError("synthetic early child exit")]},
+            {"fdinfo": "Pid:\t999\n"},
+            {"fdinfo": "Pid:\t-1\n"},
+            {"fdinfo": "Pid:\t41002\nPid:\t41002\n"},
+            {"fdinfo": "not a pidfd"},
+            {"sid": 999},
+            {"ready": True},
+            {"message": {"pid": self.child_pid, "controller_pid": 999, "start_ticks": 1}},
+        )
+        for case in cases:
+            with self.subTest(case=case), self.harness(**case) as mocks:
+                controller, close, reopen, kill = mocks
+                result = probe.collect_supervisor_probes()
+                self.assertEqual(
+                    result["controller-sigkill-detached-child"]["status"], "UNSUPPORTED"
+                )
+                self.assertEqual(result["harness-cleanup"]["status"], "UNSUPPORTED")
+                kill.assert_not_called()
+                reopen.assert_not_called()
+                controller.kill.assert_not_called()
+                close.assert_called_once_with(self.child_fd)
+                controller.terminate.assert_called_once_with()
+
+    def test_dead_controller_or_session_read_failure_does_not_signal_child(self):
+        for failure in ("controller-ended", "session-unavailable"):
+            with self.subTest(failure=failure), self.harness() as mocks:
+                controller, close, reopen, kill = mocks
+                if failure == "controller-ended":
+                    controller.poll.return_value = 0
+                with patch.object(probe.os, "getsid", side_effect=OSError("session unavailable")):
+                    result = probe.collect_supervisor_probes()
+                self.assertEqual(result["harness-cleanup"]["status"], "UNSUPPORTED")
+                kill.assert_not_called()
+                reopen.assert_not_called()
+                close.assert_called_once_with(self.child_fd)
+                controller.kill.assert_not_called()
+
+    def test_confirmed_owned_handle_only_is_signaled_then_closed(self):
+        with self.harness() as mocks:
+            controller, close, reopen, kill = mocks
+            result = probe.collect_supervisor_probes()
+            self.assertEqual(result["controller-sigkill-detached-child"]["status"], "PASS")
+            self.assertEqual(result["harness-cleanup"]["status"], "PASS")
+            kill.assert_called_once_with(self.child_fd, probe.signal.SIGKILL)
+            close.assert_called_once_with(self.child_fd)
+            reopen.assert_not_called()
+            controller.kill.assert_called_once_with()
+            controller.terminate.assert_not_called()
+
+    def test_invalid_transfers_close_all_received_fds_without_signaling(self):
+        message = {"pid": self.child_pid, "controller_pid": self.controller_pid, "start_ticks": 1}
+
+        def rights(fds):
+            return [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", fds).tobytes())]
+        cases = (
+            (b"not JSON", rights([123]), 0, [123]),
+            (b"[]", rights([123]), 0, [123]),
+            (json.dumps(message | {"pid": True}).encode(), rights([123]), 0, [123]),
+            (json.dumps({"pid": 41002}).encode(), rights([123]), 0, [123]),
+            (json.dumps(message).encode(), rights([123]), socket.MSG_TRUNC, [123]),
+            (json.dumps(message).encode(), rights([123]), socket.MSG_CTRUNC, [123]),
+            (json.dumps(message).encode(), rights([123, 124]), 0, [123, 124]),
+            (json.dumps(message).encode(), [], 0, []),
+        )
+        for payload, ancillary, flags, expected_closed in cases:
+            with (
+                self.subTest(payload=payload, flags=flags),
+                patch.object(probe.os, "close") as close,
+                patch.object(probe.signal, "pidfd_send_signal") as kill,
+            ):
+                channel = MagicMock()
+                channel.recvmsg.return_value = (payload, ancillary, flags, None)
+                with self.assertRaises((ValueError, TeamError)):
+                    probe._receive_child(channel)
+                self.assertEqual([c.args[0] for c in close.call_args_list], expected_closed)
+                kill.assert_not_called()
+
+    def test_real_synthetic_child_lifecycle_and_cleanup(self):
+        result = probe.collect_supervisor_probes()
+        self.assertEqual(result["external-cleanup"]["status"], "UNSUPPORTED")
+        observation = result["controller-sigkill-detached-child"]
+        self.assertIn(observation["status"], ("PASS", "UNSUPPORTED"))
+        if observation["status"] == "PASS":
+            self.assertEqual(result["harness-cleanup"]["status"], "PASS")

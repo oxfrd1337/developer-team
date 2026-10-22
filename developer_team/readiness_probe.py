@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import array
 import contextlib
 import errno
 import fcntl
@@ -249,20 +250,98 @@ def collect_access_probes():
 
 
 _CONTROLLER = r"""
-import json, signal, subprocess, sys, time
+import array, json, os, pathlib, signal, socket, subprocess, sys, time
 def stop(*args):
     raise SystemExit(0)
 signal.signal(signal.SIGTERM,stop)
-child=subprocess.Popen([sys.executable,'-I','-c','import time;time.sleep(8)'],
-    env={'PATH':'/usr/bin:/bin'},stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,start_new_session=True)
-try:
-    print(json.dumps({'pid':child.pid}),flush=True)
-    time.sleep(8)
-finally:
-    child.kill()
-    child.wait()
+with socket.socket(fileno=int(sys.argv[1])) as channel:
+    child=subprocess.Popen([sys.executable,'-I','-c','import time;time.sleep(8)'],
+        env={'PATH':'/usr/bin:/bin'},stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,start_new_session=True)
+    child_fd=None
+    try:
+        # This parent has not reaped its Popen child: its PID cannot be reused.
+        if child.poll() is not None:
+            raise RuntimeError('Synthetic child ended before pidfd acquisition')
+        child_fd=os.pidfd_open(child.pid)
+        fields=pathlib.Path('/proc/%d/stat' % child.pid).read_text().rsplit(')',1)[1].split()
+        message={'pid':child.pid,'controller_pid':os.getpid(),'start_ticks':int(fields[19])}
+        channel.sendmsg([json.dumps(message).encode()],
+            [(socket.SOL_SOCKET,socket.SCM_RIGHTS,array.array('i',[child_fd]))])
+        time.sleep(8)
+    finally:
+        if child_fd is not None:
+            os.close(child_fd)
+        child.kill()
+        child.wait()
 """
+
+
+def _receive_child(channel):
+    """Accept one kernel-transferred handle, never reopen a reported PID."""
+    handles = []
+    accepted = False
+    try:
+        payload, ancillary, flags, _ = channel.recvmsg(
+            1024, socket.CMSG_SPACE(4 * array.array("i").itemsize), socket.MSG_CMSG_CLOEXEC
+        )
+        unexpected = False
+        for level, kind, data in ancillary:
+            if (level, kind) != (socket.SOL_SOCKET, socket.SCM_RIGHTS):
+                unexpected = True
+                continue
+            descriptors = array.array("i")
+            descriptors.frombytes(data[: len(data) - len(data) % descriptors.itemsize])
+            handles.extend(descriptors)
+        if unexpected or flags & (socket.MSG_TRUNC | socket.MSG_CTRUNC) or len(handles) != 1:
+            raise TeamError("Synthetic child handle transfer incomplete or ambiguous")
+        message = json.loads(payload)
+        if type(message) is not dict or set(message) != {"pid", "controller_pid", "start_ticks"}:
+            raise TeamError("Invalid synthetic child identity schema")
+        if any(type(value) is not int or value <= 0 for value in message.values()):
+            raise TeamError("Invalid synthetic child identity values")
+        accepted = True
+        return handles[0], message
+    finally:
+        if not accepted:
+            for descriptor in handles:
+                os.close(descriptor)
+
+
+def _process_identity(pid):
+    """Read only our reported child's process metadata; reject malformed/dead targets."""
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_text()
+        prefix, fields = raw.rsplit(")", 1)
+        actual_pid = int(prefix.split("(", 1)[0])
+        fields = fields.split()
+        state, parent, session, started = fields[0], int(fields[1]), int(fields[3]), int(fields[19])
+        if actual_pid != pid or state not in {"R", "S", "D", "T", "t", "I"} or started <= 0:
+            raise ValueError("Unexpected process identity")
+    except (ValueError, IndexError) as exc:
+        raise TeamError("Invalid or ended synthetic process identity") from exc
+    return parent, session, started
+
+
+def _verify_child(controller, child_fd, message):
+    """Bind SCM_RIGHTS pidfd, two live snapshots and unreaped parent-owned lifetime."""
+    child = message["pid"]
+    expected = (controller.pid, child, message["start_ticks"])
+    if message["controller_pid"] != controller.pid or controller.poll() is not None:
+        raise TeamError("Synthetic child controller identity unconfirmed")
+    before = _process_identity(child)
+    fdinfo = Path(f"/proc/self/fdinfo/{child_fd}").read_text().splitlines()
+    identities = [line.split() for line in fdinfo if line.startswith("Pid:")]
+    if identities != [["Pid:", str(child)]]:
+        raise TeamError("Transferred pidfd does not bind the synthetic child")
+    if (
+        before != expected
+        or os.getsid(child) != child
+        or _process_identity(child) != before
+        or select.select([child_fd], [], [], 0)[0]
+        or controller.poll() is not None
+    ):
+        raise TeamError("Synthetic child ownership or stable identity unconfirmed")
 
 
 def collect_supervisor_probes():
@@ -286,48 +365,63 @@ def collect_supervisor_probes():
             "UNSUPPORTED", "Safe owned-process pidfd signaling unavailable"
         )
         return result
-    # Only descendants created by this fixed synthetic controller are addressed.
     child_fd = None
-    with subprocess.Popen(
-        [sys.executable, "-I", "-c", _CONTROLLER],
-        env={"PATH": "/usr/bin:/bin"},
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    ) as controller:
-        try:
-            if not select.select([controller.stdout], [], [], 3)[0]:
-                raise TeamError("Synthetic child handshake missing")
-            child = json.loads(controller.stdout.readline())["pid"]
-            child_fd = os.pidfd_open(child)
-            # Check ownership/ancestry before signaling, while controller remains alive.
-            status = Path(f"/proc/{child}/status").read_text()
-            if f"PPid:\t{controller.pid}\n" not in status or os.getsid(child) != child:
-                raise TeamError("Synthetic child ownership or detached session unconfirmed")
-            controller.kill()
-            controller.wait(timeout=2)
-            survived = not select.select([child_fd], [], [], 0.1)[0]
-            result["controller-sigkill-detached-child"] = _result(
-                "PASS" if survived else "UNSUPPORTED",
-                "Synthetic detached child survived controller SIGKILL; "
-                "demonstrates missing hard boundary",
-            )
-        except (OSError, ValueError, subprocess.SubprocessError, TeamError) as exc:
-            result["controller-sigkill-detached-child"] = _result("UNSUPPORTED", str(exc))
-        finally:
-            if child_fd is not None:
-                with contextlib.suppress(ProcessLookupError):
-                    signal.pidfd_send_signal(child_fd, signal.SIGKILL)
-                cleaned = bool(select.select([child_fd], [], [], 2)[0])
-                result["harness-cleanup"] = _result(
-                    "PASS" if cleaned else "FAIL",
-                    "Harness cleaned its synthetic child; NOT independent supervisor cleanup",
-                )
-                os.close(child_fd)
-            if controller.poll() is None:
-                controller.terminate()
+    child_verified = False
+    try:
+        receiver, sender = socket.socketpair(socket.AF_UNIX, socket.SOCK_DGRAM)
+    except OSError as exc:
+        result["controller-sigkill-detached-child"] = _result("UNSUPPORTED", str(exc))
+        return result
+    with receiver, sender:
+        receiver.settimeout(3)
+        with subprocess.Popen(
+            [sys.executable, "-I", "-c", _CONTROLLER, str(sender.fileno())],
+            env={"PATH": "/usr/bin:/bin"},
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            pass_fds=(sender.fileno(),),
+        ) as controller:
+            sender.close()
+            try:
+                child_fd, message = _receive_child(receiver)
+                _verify_child(controller, child_fd, message)
+                child_verified = True
+                controller.kill()
                 controller.wait(timeout=2)
+                survived = not select.select([child_fd], [], [], 0.1)[0]
+                result["controller-sigkill-detached-child"] = _result(
+                    "PASS" if survived else "UNSUPPORTED",
+                    "Synthetic detached child survived controller SIGKILL; "
+                    "demonstrates missing hard boundary",
+                )
+            except (OSError, ValueError, subprocess.SubprocessError, TeamError) as exc:
+                result["controller-sigkill-detached-child"] = _result("UNSUPPORTED", str(exc))
+            finally:
+                try:
+                    if child_fd is not None:
+                        try:
+                            if child_verified:
+                                with contextlib.suppress(ProcessLookupError):
+                                    signal.pidfd_send_signal(child_fd, signal.SIGKILL)
+                                cleaned = bool(select.select([child_fd], [], [], 2)[0])
+                                result["harness-cleanup"] = _result(
+                                    "PASS" if cleaned else "FAIL",
+                                    "Verified synthetic child cleanup; not an external supervisor",
+                                )
+                            else:
+                                result["harness-cleanup"] = _result(
+                                    "UNSUPPORTED", "Unverified handle closed without signaling"
+                                )
+                        except OSError as exc:
+                            result["harness-cleanup"] = _result("UNSUPPORTED", str(exc))
+                        finally:
+                            os.close(child_fd)
+                finally:
+                    if controller.poll() is None:
+                        controller.terminate()
+                        controller.wait(timeout=2)
     try:
         subprocess.run(
             [sys.executable, "-I", "-c", "import time;time.sleep(8)"],
