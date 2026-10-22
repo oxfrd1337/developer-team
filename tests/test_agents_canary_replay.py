@@ -198,8 +198,19 @@ class CanaryReplayTests(unittest.TestCase):
     def test_duplicate_terminal_is_blocked(self):
         self.blocked(cycle()[:4] + [cycle()[3]])
 
-    def test_idle_after_terminal_is_blocked(self):
-        self.blocked(cycle()[:4] + [event("agent.session.idle", session_id=SESSION, turn_id=TURN)])
+    def test_idle_after_terminal_keeps_terminal_claim_unverified(self):
+        report = self.replay(
+            cycle()[:4] + [event("agent.session.idle", session_id=SESSION, turn_id=TURN)]
+        )
+        self.assertEqual(report["status"], "SYNTHETIC_TERMINAL_OBSERVED")
+        self.assertEqual(report["terminal_kind_claimed"], "agent.session.turn.completed")
+
+    def test_idle_after_usage_keeps_terminal_claim(self):
+        report = self.replay(
+            cycle() + [event("agent.session.idle", session_id=SESSION, turn_id=TURN)]
+        )
+        self.assertEqual(report["status"], "SYNTHETIC_TERMINAL_OBSERVED")
+        self.assertTrue(report["usage_claim_seen"])
 
     def test_usage_before_terminal_is_blocked(self):
         self.blocked(cycle()[:3] + [cycle()[4], cycle()[3]])

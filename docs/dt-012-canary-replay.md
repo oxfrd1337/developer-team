@@ -22,7 +22,7 @@ Die Eingabe besteht aus maximal 64 flachen Python-`dict`-Objekten. Jedes Ereigni
 | `submission_uncertain` | dieselben | Antwort unklar: **nicht** blind erneut senden; nur ursprünglichen Vorgang extern rekonstruieren |
 | `session_receipt` | `session_id`, `turn_id` | Behaupteter Sitzungs- und Turnbezug nach einem Submit |
 | `cancel_requested` | dieselben | Nur behauptete Abbruchanforderung, **kein** Nachweis der erfolgreichen Fernabschaltung |
-| `agent.session.idle` | dieselben | Idle/kein Turnabschlussbeleg; darf nicht als abgeschlossen bewertet werden |
+| `agent.session.idle` | dieselben | Idle vor einem Terminalereignis ist kein Abschlussbeleg; ein späteres Idle lässt ein bereits beobachtetes Terminalereignis unverändert |
 | `agent.session.turn.completed` | dieselben | Behauptetes erfolgreiches Terminalereignis |
 | `agent.session.turn.failed` | dieselben | Behauptetes fehlgeschlagenes Terminalereignis |
 | `agent.session.turn.cancelled` | dieselben | Behauptetes abgebrochenes Terminalereignis; ohne Providerattestierung weiterhin unbestätigt |

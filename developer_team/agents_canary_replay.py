@@ -126,9 +126,10 @@ def replay_canary_trace(
                     cancel_requested = True
                     stage = "cancel"
                 elif kind == "agent.session.idle":
-                    if stage not in {"session", "idle", "cancel"}:
+                    if stage not in {"session", "idle", "cancel", "terminal", "usage"}:
                         raise InvalidCanaryTrace("invalid_idle_order")
-                    if stage != "cancel":
+                    # Idle may follow a terminal event; it never replaces that evidence.
+                    if stage in {"session", "idle"}:
                         stage = "idle"
                 elif kind in _TERMINAL:
                     if stage not in {"session", "idle", "cancel"}:
