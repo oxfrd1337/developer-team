@@ -101,3 +101,21 @@ historischen SHA-/Runreferenzen ergänzt; finaler Status bleibt im PR prüfbar.
 Lokal fehlen anfangs Ruff, Coverage und Build-Frontend sowie Python 3.11/3.13.
 Diese werden nicht als lokal bestanden ausgegeben. Keine Checks oder Workflows wurden
 für eine grüne Anzeige abgeschwächt. Der vollständige GitHubnachweis bleibt erforderlich.
+
+Erster lokaler Gesamtlauf: **227 Tests, 225 PASS, 1 ERROR, 1 Host-Skip**.
+Der unveränderte `test_positive_controls_detect_access_when_boundary_is_absent`
+scheitert an `socket.socket: PermissionError / Operation not permitted` des Workers.
+Der optionale Namespace-Test bleibt wegen Hostgrenzen übersprungen. Die fünf neuen
+Preflightmethoden bestehen vollständig. Keine Tests wurden dafür entfernt/geändert.
+Konfigurationsvalidierung besteht. Der vorhandene modellfreie Testadapter-Gesamtlauf
+endet erwartungsgemäß blocked, beide lokalen Pilotchecks pass, sechs simulierte Tasks
+einschließlich einer QA-Korrektur, **0 echte Cloudsubmissions / 0 Remotemutationen**.
+Diese bestehende Korrekturdemo ist kein vierfacher Livepilot und erweitert dessen
+vorgeschlagenes Vier-Aufgaben-Budget nicht.
+
+Erster CI-Versuch: [Run 39746998524](https://github.com/oxfrd1337/developer-team/actions/runs/39746998524),
+HEAD `ee6353fdfc99dd3ea3a45d6086fc8154ad1312ac`, **nicht vollständig grün**:
+die drei Qualitätsjobs scheitern an genau einer 101-Zeichen-Zeile im neuen Preflight
+(Ruff E501); CLI-Probe und beide Checkpoint-/Restorejobs bestehen. Die Zeile wurde
+verkürzt, zusätzlich die Testformatierung an den bestehenden Stil angepasst.
+Der nächste Lauf prüft wieder die vollständige unveränderte CI.

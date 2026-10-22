@@ -54,15 +54,16 @@ class PreflightTests(unittest.TestCase):
         workspace.assert_clean.side_effect = TeamError("dirty")
         with (
             patch("developer_team.preflight.GitWorkspace", return_value=workspace),
-            patch("developer_team.preflight.load_config", return_value=replace(
-                config, repository="other/project"
-            )),
+            patch(
+                "developer_team.preflight.load_config",
+                return_value=replace(config, repository="other/project"),
+            ),
             patch.object(CodexCloudGateway, "probe", return_value={}),
         ):
             report = inspect(Path("."))
-        self.assertTrue({"basis", "scope", "checkout"} <= {
-            o["control"] for o in report["observations"]
-        })
+        self.assertTrue(
+            {"basis", "scope", "checkout"} <= {o["control"] for o in report["observations"]}
+        )
 
     def test_real_gateway_blocks_before_journal_refs_or_process_for_any_claim(self):
         for claim in (
@@ -79,8 +80,15 @@ class PreflightTests(unittest.TestCase):
                 gateway.simulated = True  # A report or mutable label supplies no capability.
                 with self.assertRaisesRegex(PermissionDenied, "DT-008 NO-GO"):
                     gateway.submit(
-                        config=None, effective_digest="", policy=None, grant=None,
-                        role=None, branch="", expected_sha="", prompt="", approval=claim,
+                        config=None,
+                        effective_digest="",
+                        policy=None,
+                        grant=None,
+                        role=None,
+                        branch="",
+                        expected_sha="",
+                        prompt="",
+                        approval=claim,
                     )
                 process.assert_not_called()
                 self.assertEqual(store.mock_calls, [])

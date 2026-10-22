@@ -26,7 +26,7 @@ BLOCKERS = {
     "provider-stop": "CLI 0.163.0 exposes no remote cancel or authoritative stop acknowledgement",
     "provider-idempotency": "No provider idempotency key; unknown submission must never retry",
     "usage-limit": "No independently verified remaining quota or enforced provider cost cap",
-    "github-protection": "Effective strict branch/ruleset protection requires independent API proof",
+    "github-protection": "Strict branch/ruleset protection requires independent API proof",
     "cloud-runtime": "Published role environment IDs and enforced current setup not verified",
 }
 BASE_SHA = "799f6719dc7c39d64f8738023e4f8fec851ddd21"
