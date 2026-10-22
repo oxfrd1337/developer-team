@@ -31,7 +31,7 @@ def _text(value):
 
 
 def _hash(value, length):
-    if type(value) is not str or re.fullmatch(r"[0-9a-f]{%d}" % length, value) is None:
+    if type(value) is not str or re.fullmatch(rf"[0-9a-f]{{{length}}}", value) is None:
         raise TeamError("Invalid readiness digest")
 
 

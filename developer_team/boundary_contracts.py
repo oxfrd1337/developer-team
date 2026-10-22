@@ -36,14 +36,14 @@ class ContractOnlyBroker:
         self.peer = peer
         self.consumed = False
 
-    def demonstrate(self, peer, binding, operation, fake_token, *, now):
+    def demonstrate(self, peer, binding, operation, canary, *, now):
         _time(now)
         if (
             peer is not self.peer
             or binding != self.peer.binding
             or now >= self.peer.binding.expires_at
             or operation != "synthetic-model-response"
-            or fake_token != "DT007-NOT-A-CREDENTIAL"
+            or canary != "DT007-NOT-A-CREDENTIAL"
             or self.consumed
         ):
             raise PermissionDenied("Contract-only broker rejected request")
