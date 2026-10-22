@@ -440,9 +440,7 @@ class CanaryReplayTests(unittest.TestCase):
                         report = self.blocked(seq)
                     finally:
                         sys.settrace(previous_trace)
-                    self.assertEqual(
-                        report["reasons"], [f"event_{position}:event_dict_too_large"]
-                    )
+                    self.assertEqual(report["reasons"], [f"event_{position}:event_dict_too_large"])
 
     def test_compact_native_instance_dictionaries_remain_valid(self):
         class Record:
