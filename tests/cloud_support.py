@@ -14,7 +14,7 @@ from developer_team.adapters.cloud_agents import (
     cloud_authority,
 )
 from developer_team.adapters.cloud_contracts import RESULT_PATH, CloudApproval
-from developer_team.adapters.codex_cloud import CodexCloudGateway
+from developer_team.adapters.offline_cloud import _OfflineCloudLifecycle
 from developer_team.adapters.synthetic import DEVELOPER_TESTS, REQUIREMENT, create_fixture
 from developer_team.authority import ProjectGrant, RuntimePolicy
 from developer_team.config import load_config
@@ -22,6 +22,17 @@ from developer_team.engine import Engine
 from developer_team.models import Role, TeamError
 from developer_team.store import RunStore
 from tests.support import EXAMPLE
+
+
+class FixtureCloudGateway(_OfflineCloudLifecycle):
+    """Test-source-only scripted transport; never wired by the production API."""
+
+    def __init__(self, responses, *, store, refs, now):
+        super().__init__(store=store, refs=refs, now=now)
+        self._responses = responses
+
+    def _request(self, argv):
+        return self._responses(argv)
 
 
 class Clock:
@@ -219,7 +230,7 @@ def cloud_harness(directory: Path, **approval_overrides):
     store = RunStore(directory / "state.sqlite3")
     refs = FakeRefs()
     cli = FakeCloudCLI(workspace, clock)
-    gateway = CodexCloudGateway(cli, store=store, refs=refs, now=clock)
+    gateway = FixtureCloudGateway(cli, store=store, refs=refs, now=clock)
     agents = CodexCloudAgents(gateway, approval, grant, policy)
     authority = cloud_authority(grant)
     delivery = CloudPreviewDelivery(workspace, config.repository)

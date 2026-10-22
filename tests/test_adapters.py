@@ -3,7 +3,6 @@ import unittest
 from dataclasses import replace
 from unittest.mock import Mock
 
-from developer_team.adapters.codex_cloud import CodexCloudGateway
 from developer_team.adapters.github import (
     GitHubMerger,
     GitHubPRWriter,
@@ -20,6 +19,7 @@ from developer_team.models import (
     PermissionDenied,
     Role,
 )
+from tests.cloud_support import FixtureCloudGateway
 
 from .support import EXAMPLE
 
@@ -361,7 +361,7 @@ class CodexCloudAdapterTests(unittest.TestCase):
             0,
             digest("controlled input"),
         )
-        self.gateway = CodexCloudGateway(
+        self.gateway = FixtureCloudGateway(
             self.runner,
             store=RunStore(Path(directory.name) / "state.sqlite3"),
             refs=FakeRefs(),

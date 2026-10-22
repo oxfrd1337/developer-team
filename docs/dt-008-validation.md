@@ -66,6 +66,45 @@ für Cloudattestierungen gebaut: Ein negativer Signaturclaim-Test belegt nur die
 Verweigerung, keine existierende PKI oder Hostabnahme. Bestehende Broker-/Lease-/
 Reviewverträge werden wiederverwendet und bleiben ausdrücklich Offlinebelege.
 
+## Sicherheitsreview und Korrektur der Transportgrenze
+
+Der [Review vom 22.10.2026](https://github.com/oxfrd1337/developer-team/pull/11#pullrequestreview-5611437964)
+zu HEAD `f0bdc914e73fa498f405d8195a5ec7c72f7a56d3` weist korrekt nach, dass
+`runner is run_cli` nur ein Funktionsobjekt sperrt. Lambda, Partial oder Callable
+könnten echte Submissions weiterleiten. Die früheren Default-Runner-Tests und grünen
+CI-Läufe belegen **keinen Schutz gegen diese Umgehung**.
+
+Korrektur: produktiver `CodexCloudGateway` ohne Runnerparameter, bedingungslose
+NO-GO-Verweigerung für Submission und Collection. Die produktive Probe verwendet nur
+fest vorgegebene lesende CLI-Argumente. Der bisherige Lifecycle lebt getrennt in
+`_OfflineCloudLifecycle` ohne CLI-/Netzwerktransport. `RehearsalCloudGateway` verdrahtet
+fest den deterministischen `RehearsalCLI`; frei geskriptete Vertragstransporte gibt es
+nur in `tests/cloud_support.py`. Kein Produktionskonstruktor kann sie auswählen.
+
+`python -m unittest tests.test_cloud_start_boundary -v`: sieben neue Methoden bestehen
+lokal. Vor jedem Produktionstest werden die ansonsten gültigen Repo-/Config-/Run-/Job-/
+Rollen-/Umgebungs-/Zeitbindungen durch die bestehende Offline-Autorisierungsprüfung
+positiv kontrolliert. Geprüft sind direkte Funktion, Lambda, Partial, Callable-Objekt,
+positionelle/benannte Runnerinjektion, nachträgliche runner/_runner/transport-Attribute,
+vier Simulationskennzeichen, Fake-Grants/-Approvals/-Jobs sowie gesperrte Collection.
+Negative Produktionsfälle verlangen keine CLI-/Popen-Aufrufe und leere Ref-/Journal-
+Mockaufruflisten. Der feste Rehearsaltransport liefert auch bei solchen Attributen und
+geändertem Label ausschließlich simulierte Receipts, ohne Prozessstart.
+
+Bestehende Cloud-/Pilot-Vertragstests bleiben erhalten und verwenden explizite
+Offline-Fixtures; Loginprobetests patchen nur die feste lesende Prozessfunktion.
+Die sieben neuen Methoden sind zusätzlich zu den früheren 227 Tests auszuführen.
+Die unveränderte vollständige CI muss für den korrigierten finalen HEAD erneut laufen;
+die folgenden älteren Läufe sind ausschließlich historische Nachweise ihres Standes.
+
+Gesamtlauf der Reviewkorrektur lokal unter Python 3.12.14 und 3.13.5: jeweils
+**234 Tests, 232 PASS / 1 unveränderter Socket-Host-ERROR / 1 alter Namespace-Host-Skip**.
+Der bestehende Sockettest scheitert weiterhin an der Workerbeschränkung; keine neue
+Produktionsfreigabe und keine abgeschwächten Hostprüfungen. Konfigurationsvalidierung,
+sanitisierte CLI-Probe und lesender Preflight sind ausführbar; Preflight bleibt
+BLOCKED / NO-GO. Endgültiger neuer CI-Run samt finalem HEAD wird im Draft-PR #11
+nachvollziehbar ergänzt; kein neuer PR und kein Merge.
+
 ## Nicht verfügbare echte Abnahmen
 
 Alle folgenden Kontrollen bleiben **UNSUPPORTED**, niemals PASS: vier unabhängige

@@ -169,3 +169,13 @@ Verbindung, falsche Basis/Scope, verbotene Freigabeparameter und reale Cloud-Sta
 vor Prozess-/Journal-/Refzugriff. `python -m developer_team.preflight` ist ein lesender
 BLOCKED/NO-GO-Trockenlauf (Exitcode 2). Bestehende Lifecycle- und Bindungsnegativtests
 bleiben unverändert aktiv; [Nachweise und Grenzen](dt-008-validation.md).
+
+Die Reviewkorrektur ergänzt `tests/test_cloud_start_boundary.py`: sieben gezielte
+Tests mit ansonsten gültigen Pilotbindungen prüfen direkten Runner, Lambda-Wrapper,
+`functools.partial`, Callable-Objekt, Konstruktorinjektion, nachträgliche Attribute,
+veränderte Simulationslabels und Fake-Grants. Für verweigerte produktive Aufrufe
+gelten `subprocess.Popen.assert_not_called()` sowie keinerlei Ref-/Journalzugriff.
+Der produktive Gateway akzeptiert keinen Runner und verweigert bedingungslos;
+Lifecycle-Fixtures sind davon getrennt. Die feste Rehearsalantwort bleibt selbst bei
+gesetzten Runnerattributen modellfrei. Bestehende Vertragstests wurden auf die
+separate Test-Fixture umgestellt, ihre Prüfbedingungen nicht abgeschwächt.

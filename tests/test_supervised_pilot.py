@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 from developer_team.adapters.cloud_contracts import CloudApproval
 from developer_team.adapters.codex_cloud import CodexCloudGateway
-from developer_team.adapters.pilot_fake import RehearsalCLI, RehearsalRefs, _patch
+from developer_team.adapters.pilot_fake import RehearsalCLI, RehearsalCloudGateway, _patch
 from developer_team.adapters.synthetic import create_fixture
 from developer_team.authority import ProjectGrant
 from developer_team.cli import main, parser
@@ -50,6 +50,11 @@ PROBE = {
         True,
     ),
 }
+
+
+class SupervisedGatewayFixture(RehearsalCloudGateway):
+    def probe(self):
+        return dict(PROBE)
 
 
 class SupervisedPilotTests(unittest.TestCase):
@@ -108,10 +113,8 @@ class SupervisedPilotTests(unittest.TestCase):
 
     def fake_gateway(self, *, store, refs):
         workspace = refs.workspace
-        return CodexCloudGateway(
-            RehearsalCLI(workspace, store, self.approval.run_id, self.scenario),
-            store=store,
-            refs=RehearsalRefs(workspace),
+        return SupervisedGatewayFixture(
+            workspace, store, self.approval.run_id, self.scenario,
             now=self.clock,
         )
 
