@@ -367,7 +367,9 @@ class CanaryReplayTests(unittest.TestCase):
                             del seq[position]["amount_usd_cents"]
                     key.calls.clear()  # Caller-side dict construction is outside validation.
                     report = self.blocked(seq)
-                    self.assertEqual(report["reasons"], [f"event_{position}:invalid_event_key_type"])
+                    self.assertEqual(
+                        report["reasons"], [f"event_{position}:invalid_event_key_type"]
+                    )
                     self.assertEqual(key.calls, [])
 
     def test_explosive_key_callbacks_are_never_invoked(self):
