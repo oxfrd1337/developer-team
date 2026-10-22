@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fcntl
 import json
+import re
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -28,6 +29,41 @@ from .models import (
     Stage,
     TeamError,
 )
+
+_EXEC_VERIFICATION_DIGESTS = {
+    "head_sha": 40,
+    "tree_sha": 40,
+    "content_digest": 64,
+    "inventory_digest": 64,
+    "controller_inventory_digest": 64,
+    "controller_checks_digest": 64,
+    "patch_digest": 64,
+    "payload_digest": 64,
+    "source_patch_digest": 64,
+}
+
+
+def _exec_verification(job_id: str, value: dict) -> dict:
+    """Copy and validate diagnostics, never promote caller claims into authority."""
+    if type(job_id) is not str or re.fullmatch(r"[0-9a-f]{64}", job_id) is None:
+        raise TeamError("Invalid exec verification job digest")
+    if type(value) is not dict:
+        raise TeamError("Exec verification requires an exact diagnostic schema")
+    result = value.copy()
+    expected = {"source", "origin", "execution_attested", *_EXEC_VERIFICATION_DIGESTS}
+    if set(result) != expected or (
+        type(result["source"]) is not str
+        or result["source"] != "controller:exec-result-validator-v1"
+        or type(result["origin"]) is not str
+        or result["origin"] != Origin.SIMULATED.value
+        or result["execution_attested"] is not False
+    ):
+        raise TeamError("Exec verification requires simulated, non-attesting diagnostics")
+    for name, length in _EXEC_VERIFICATION_DIGESTS.items():
+        field = result[name]
+        if type(field) is not str or re.fullmatch(rf"[0-9a-f]{{{length}}}", field) is None:
+            raise TeamError("Invalid exec verification diagnostic digest")
+    return result
 
 
 class RunStore:
@@ -273,6 +309,38 @@ class RunStore:
                 "SELECT payload FROM exec_calls WHERE run_id = ? ORDER BY rowid", (run_id,)
             ).fetchall()
         return [json.loads(row[0]) for row in rows]
+
+    def record_exec_verification(self, job_id: str, verification: dict) -> None:
+        """Diagnostic provenance only; this journal cannot issue trusted receipts."""
+        verification = _exec_verification(job_id, verification)
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT payload FROM exec_calls WHERE id = ?", (job_id,)
+            ).fetchone()
+            record = json.loads(row[0]) if row else {}
+            if (
+                type(record) is not dict
+                or record.get("state") != "completed"
+                or "controller_verification" in record
+            ):
+                raise TeamError("Exec verification requires a unique completed transport")
+            job = record.get("job")
+            if (
+                record.get("id") != job_id
+                or record.get("simulated") is not True
+                or type(job) is not dict
+                or job.get("head_sha") != verification["head_sha"]
+            ):
+                raise TeamError("Exec verification does not match the simulated transport")
+            record["controller_verification"] = verification
+            payload = json.dumps(record, sort_keys=True)
+            connection.execute("UPDATE exec_calls SET payload = ? WHERE id = ?", (payload, job_id))
+            connection.execute(
+                "INSERT INTO events(run_id, kind, payload) "
+                "VALUES (?, 'exec:controller-verified', ?)",
+                (record["run_id"], payload),
+            )
 
     def check_exec_runtime(self, run_id: str, now: float) -> None:
         records = self.exec_calls(run_id)

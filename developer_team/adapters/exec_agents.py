@@ -10,6 +10,7 @@ from pathlib import Path
 from ..authority import EvidenceAuthority
 from ..models import Origin, PermissionDenied, Role, TeamError, digest
 from ..roles import ROLE_INSTRUCTIONS
+from ..snapshot import SnapshotSeal
 from ..workspace import GitWorkspace
 from .cloud_contracts import fields, text_value
 from .cloud_results import CloudResultImporter
@@ -75,6 +76,7 @@ class CodexExecAgents(StructuredAgents):
             context.cycle,
             digest(inputs),
         )
+        controller_seal = SnapshotSeal.capture(context.workspace, job.head_sha)
         # Copies are separate per call, without shared Git objects or host credentials.
         # This is simulation hygiene, NOT an OS write boundary for hostile same-UID code.
         with tempfile.TemporaryDirectory(prefix=f"dt-exec-{role.value}-") as directory:
@@ -91,6 +93,9 @@ class CodexExecAgents(StructuredAgents):
             snapshot = GitWorkspace(checkout)
             snapshot.git("checkout", "--detach", job.head_sha)
             snapshot.assert_clean(job.head_sha)
+            seal = SnapshotSeal.capture(snapshot, job.head_sha)
+            if seal.content_digest != controller_seal.content_digest:
+                raise TeamError("Exec snapshot differs from the controller content")
             instructions = ROLE_INSTRUCTIONS[role]
             if role == Role.ORCHESTRATOR:
                 instructions += "\n" + ROLE_INSTRUCTIONS[Role.ARCHITECT]
@@ -108,6 +113,8 @@ class CodexExecAgents(StructuredAgents):
                 sort_keys=True,
             )
             result = self.gateway.execute(job, checkout, prompt)
+            seal.verify(snapshot)
+            controller_seal.verify(context.workspace)
             snapshot.assert_clean(job.head_sha)
             context.workspace.assert_clean(job.head_sha)
             fields(result, {"patch"})
@@ -118,6 +125,25 @@ class CodexExecAgents(StructuredAgents):
             ):
                 raise TeamError("Missing or oversized exec patch")
             payload, source = self.importer.extract(context.workspace, context.config, job, patch)
+            seal.verify(snapshot)
+            controller_seal.verify(context.workspace)
+            self.gateway.store.record_exec_verification(
+                job.id,
+                {
+                    "source": "controller:exec-result-validator-v1",
+                    "head_sha": seal.head_sha,
+                    "tree_sha": seal.tree_sha,
+                    "content_digest": seal.content_digest,
+                    "inventory_digest": digest(seal.inventory),
+                    "controller_inventory_digest": digest(controller_seal.inventory),
+                    "controller_checks_digest": digest(dict(context.checks)),
+                    "patch_digest": digest(patch),
+                    "payload_digest": digest(payload),
+                    "source_patch_digest": digest(source),
+                    "execution_attested": False,
+                    "origin": Origin.SIMULATED.value,
+                },
+            )
         return job, payload, source
 
     def develop(self, context, plan, architecture, findings):

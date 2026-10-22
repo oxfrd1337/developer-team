@@ -1,5 +1,21 @@
 # Teststrategie
 
+DT-006 ergänzt `tests/test_boundaries.py`, Inhalts-/Auditprüfungen im Exec-Pfad und
+`python -m developer_team.boundary_probe`. Die Offline-Probe verwendet nur künstliche
+Credentials und eigene lokale Canaries/Prozesse. Sie liefert immer **NO-GO** mit
+Exitcode 2; fehlende Hostfähigkeiten sind `UNSUPPORTED`, kein Skip-als-PASS.
+Einzelne erfolgreiche Namespace-/Negativprobes geben keinen Modellzugriff frei.
+Neue Regressionstests prüfen versteckte/Git-/Cross-Controller-Manipulation,
+`assume-unchanged`, falsche Attestierungen und die unabhängigen Controllerchecks.
+Design und Aussagegrenzen: [dt-006.md](dt-006.md); tatsächlich ausgeführte Checks:
+[dt-006-validation.md](dt-006-validation.md). Alle bisherigen CI-Anforderungen gelten
+weiter; nicht verfügbare Werkzeuge oder nicht gestartete Jobs sind offene Checks.
+
+Die Reviewkorrektur zu PR #7 ergänzt Schema-/Typ-/Digest-/Transporttests für die
+Diagnose-Schnittstelle sowie getrennte Vertragstests für teilweise verfügbare
+Hostgrenzen. `UNSUPPORTED` bleibt ein fehlender Nachweis bei **NO-GO**; tatsächliche
+Zugriffsverletzungen (`FAIL`) und unbekannte Statuswerte lassen den Hosttest scheitern.
+
 DT-004 ergänzt `tests/test_supervised_pilot.py`: lokale Vorbereitung ohne Cloud,
 feste Dateigrenzen, vier Umgebungen, unveränderliche Grants/Budgets, verlorenes Journal,
 gesperrte Anmeldung/Sandbox, Ergebnis-/Status-/Testbelege sowie echte Python-Fehler
