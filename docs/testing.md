@@ -131,3 +131,24 @@ Python-Prozessen als ausdrücklich simulierten CLI-Antworten. Es wird kein Codex
 oder Modellprozess gestartet. Budgets, Ressourcen-/Ausgabegrenzen, Abbruch,
 Ergebnisbindung, Reviewtrennung und Live-/Merge-Sperren sind in
 [dt-005.md](dt-005.md) beschrieben. Diese Tests attestieren keine OS-Isolation.
+
+## DT-007
+
+```sh
+python -m unittest tests.test_readiness tests.test_boundaries tests.test_exec -v
+python -m developer_team.readiness_probe > /tmp/dt007-probes.json
+# Erwarteter Exitcode 2: NO-GO, unabhängig von bestandenen Einzelprobes.
+```
+
+`test_readiness.py` prüft strikte Diagnose-/Bindungsschemas, Fake-PASS und fehlende
+unabhängige Attestierung, JSON-/SQLite-/Env-/Projekt-/CI-Claims ohne Popen,
+synthetische Brokeridentität und Replay, absolute Lease, atomaren Einmalintent,
+Journalfehler und unveränderte Reviewquellen einschließlich bewusst nachgewiesener
+Write-and-Restore-Lücke. Neue echte Hostprobes betreffen ausschließlich eigene
+Datei-/FD-/Env-Canaries, lokale DNS-/IPv4-/IPv6-/HTTP-/TCP-/UDP-/Unix-/Abstractziele
+sowie eigene synthetische Prozesse mit Controller-SIGKILL und Detached Child.
+Kein Modell wird aufgerufen. Fehlende Hostfunktionen bleiben UNSUPPORTED, ohne
+unsandboxierten Ersatzlauf als vermeintlichen Isolationsbeweis. Positive Kontrollen
+sind Voraussetzung für negative Zugriffsbelege. Der Prozessharness ist kein externer
+Supervisor. [DT-007](dt-007.md) trennt lokale Vertrags-PASS von Live-NO-GO;
+[Validierung](dt-007-validation.md) dokumentiert Befehle, Hashes und echte CI.

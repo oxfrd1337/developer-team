@@ -114,3 +114,11 @@ zusätzlichen controllerseitigen Snapshotprüfungen sind in [DT-006](docs/dt-006
 beschrieben; offene Host-/Credential-/Netz-/Supervisorgrenzen und die nächste
 Freigabeentscheidung stehen dort zusammen mit dem Risikoregister.
 Prüfergebnisse: [Validierungsprotokoll](docs/dt-006-validation.md).
+
+## DT-007: Offline-Sicherheitsarchitektur
+
+[DT-007](docs/dt-007.md) ergänzt rein synthetische Broker-/Lease-/Reviewverträge,
+einen typisierten, nichtautoritativen NO-GO-Bericht und lokale modellfreie
+Negativprobes. Kein produktiver Runner: **Live bleibt NO-GO**, auch bei grüner CI.
+Nachweise und konkrete verbleibende Betriebsblocker:
+[Validierung](docs/dt-007-validation.md).
