@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "binding": {
+    "repo": "synthetic/manual",
+    "issue": 15,
+    "branch": "dt-010/example",
+    "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "pr": 16,
+    "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "allowed_files": [
+    "src/example.py"
+  ],
+  "changed_files": [
+    "src/example.py"
+  ],
+  "developer": "synthetic-dev",
+  "ci": {
+    "binding": {
+      "repo": "synthetic/manual",
+      "issue": 15,
+      "branch": "dt-010/example",
+      "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pr": 16,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "run_url": "https://github.com/synthetic/manual/actions/runs/123",
+    "jobs": {
+      "tests": {
+        "status": "PASS",
+        "evidence": "synthetic evidence; not an attestation"
+      }
+    }
+  },
+  "risks": [
+    "Nur synthetische Angaben; keine Providerattestierung.",
+    "Branch Protection und Host-Isolierung unabhängig prüfen."
+  ],
+  "unknown_checks": [],
+  "blockers": [],
+  "qa": {
+    "binding": {
+      "repo": "synthetic/manual",
+      "issue": 15,
+      "branch": "dt-010/example",
+      "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pr": 16,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "reviewer": "synthetic-qa",
+    "task_ref": "synthetic-task-qa",
+    "status": "PASS",
+    "evidence": "synthetic evidence; not an attestation"
+  },
+  "security": {
+    "binding": {
+      "repo": "synthetic/manual",
+      "issue": 15,
+      "branch": "dt-010/example",
+      "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pr": 16,
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "reviewer": "synthetic-security",
+    "task_ref": "synthetic-task-security",
+    "status": "UNSUPPORTED",
+    "evidence": "synthetic evidence; not an attestation",
+    "checks": {
+      "deployment": {
+        "status": "UNSUPPORTED",
+        "evidence": "Synthetisch: Deployment-Historie nicht auslesbar."
+      },
+      "dependencies": {
+        "status": "PASS",
+        "evidence": "synthetic evidence; not an attestation"
+      },
+      "role_isolation": {
+        "status": "PASS",
+        "evidence": "synthetic evidence; not an attestation"
+      },
+      "budgets": {
+        "status": "PASS",
+        "evidence": "synthetic evidence; not an attestation"
+      },
+      "secrets": {
+        "status": "PASS",
+        "evidence": "synthetic evidence; not an attestation"
+      },
+      "permissions": {
+        "status": "PASS",
+        "evidence": "synthetic evidence; not an attestation"
+      },
+      "remote_stop": {
+        "status": "PASS",
+        "evidence": "synthetic evidence; not an attestation"
+      },
+      "branch_protection": {
+        "status": "PASS",
+        "evidence": "synthetic evidence; not an attestation"
+      }
+    }
+  }
+}

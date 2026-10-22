@@ -1,5 +1,13 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
+## DT-010 V0.1: manuell beaufsichtigte Übergaben
+
+[Deutsche Bedienungsanleitung mit vier Prompt-Vorlagen](docs/dt-010-manual-workflow.md)
+für Architektur, Developer, QA und Security sowie ein optionaler Offline-Abgleich.
+Aufgaben werden weiterhin einzeln durch den Betreiber gestartet; fehlende oder
+veraltete Belege, FAIL und UNSUPPORTED blockieren. Keine automatische Merge- oder
+Cloudfreigabe; produktive Cloud-Aufrufe bleiben gesperrt.
+
 ## DT-008: erster echter Vier-Rollen-Pilot bleibt NO-GO
 
 Die Betriebswegprüfung bestätigt CLI 0.163.0 und bestehenden ChatGPT-Login, aber keinen
