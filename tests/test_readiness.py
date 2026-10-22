@@ -507,6 +507,7 @@ class SupervisorIdentityTests(unittest.TestCase):
 
         def rights(fds):
             return [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", fds).tobytes())]
+
         cases = (
             (b"not JSON", rights([123]), 0, [123]),
             (b"[]", rights([123]), 0, [123]),

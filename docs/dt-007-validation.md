@@ -186,3 +186,12 @@ alle übrigen Live-Kontrollen bleiben UNSUPPORTED / NO-GO. Der erneuerte Probebe
 oben bindet exakt den aktuellen Probequellhash. Die bisherigen CI-Läufe sind nur
 historische Nachweise; der neue HEAD, alle sechs Jobs und deren echte Ergebnisse
 werden in der aktualisierten Beschreibung desselben Draft-PR #9 festgehalten.
+
+
+Erster CI-Versuch der Reviewkorrektur:
+[Run 39743023739](https://github.com/oxfrd1337/developer-team/actions/runs/39743023739),
+HEAD `653a877fdd991bb091e794f8cd6b3b96433fc496`: Ruff inklusive Securityregeln
+bestand; der Formatcheck verlangte eine zusätzliche Leerzeile in der neuen
+Testhilfsfunktion. Diesen exakten Formatter-Diff übernommen. CLI-Probe, Checkpoint
+und Restore bestanden, die Qualitätsjobs wurden vor Tests/Build gestoppt. Dieser
+Lauf wird nicht als vollständiger grüner Nachweis gewertet.
