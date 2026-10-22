@@ -191,9 +191,9 @@ class CanaryReplayTests(unittest.TestCase):
         self.blocked(seq)
 
     def test_conflicting_terminal_event_is_blocked(self):
-        self.blocked(cycle()[:4] + [
-            event("agent.session.turn.cancelled", session_id=SESSION, turn_id=TURN)
-        ])
+        self.blocked(
+            cycle()[:4] + [event("agent.session.turn.cancelled", session_id=SESSION, turn_id=TURN)]
+        )
 
     def test_duplicate_terminal_is_blocked(self):
         self.blocked(cycle()[:4] + [cycle()[3]])
