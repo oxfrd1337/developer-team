@@ -99,7 +99,7 @@ class ManualHandoffTests(unittest.TestCase):
         self.blocked()
 
     def test_scopes_traversal_globs_and_command_injection(self):
-        for path in ("../README.md", "/tmp/file", "src/../file", "src//file", "src/./file",
+        for path in ("../README.md", "/absolute/file", "src/../file", "src//file", "src/./file",
                      ".git/config", "src\\file", "src/*", "$(touch hacked)", "`id`", "a\nb"):
             with self.subTest(path=path):
                 for key in ("allowed_files", "changed_files"):
