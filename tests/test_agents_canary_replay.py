@@ -1,10 +1,18 @@
 """Negative and safety cases for DT-012 normalized synthetic canary traces."""
 
 import copy
+import dis
+import sys
 import unittest
 from unittest.mock import Mock, patch
 
-from developer_team.agents_canary_replay import MAX_EVENTS, replay_canary_trace
+from developer_team.agents_canary_replay import (
+    MAX_EVENT_DICT_BYTES,
+    MAX_EVENTS,
+    InvalidCanaryTrace,
+    _event,
+    replay_canary_trace,
+)
 
 INTENT = "synthetic-dt012-run"
 KEY = "synthetic-message-key"
@@ -378,6 +386,149 @@ class CanaryReplayTests(unittest.TestCase):
                     fields.__contains__.assert_not_called()
                     fields.__getitem__.assert_not_called()
                     make_set.assert_not_called()
+
+    def test_compact_three_field_event_remains_valid(self):
+        raw = {"type": "intent_recorded", "intent_id": INTENT, "idempotency_key": KEY}
+        self.assertEqual(len(raw), 3)
+        self.assertIs(_event(raw), raw)
+        self.assertEqual(self.replay([raw])["status"], "INCOMPLETE")
+
+    def test_compact_four_field_event_remains_valid(self):
+        raw = {
+            "type": "usage_observed",
+            "session_id": SESSION,
+            "turn_id": TURN,
+            "amount_usd_cents": 4,
+        }
+        self.assertEqual(len(raw), 4)
+        self.assertIs(_event(raw), raw)
+        report = self.replay(cycle()[:4] + [raw])
+        self.assertEqual(report["status"], "SYNTHETIC_TERMINAL_OBSERVED")
+        self.assertTrue(report["usage_claim_seen"])
+
+    def test_sparse_events_are_blocked_before_first_dictionary_iteration(self):
+        iteration_offsets = {
+            instruction.offset
+            for instruction in dis.get_instructions(_event)
+            if instruction.opname == "GET_ITER"
+        }
+        self.assertTrue(iteration_offsets)
+
+        def forbid_iteration(frame, event_name, arg):
+            if frame.f_code is _event.__code__ and frame.f_locals.get("value") is raw:
+                frame.f_trace_opcodes = True
+                if event_name == "opcode" and frame.f_lasti in iteration_offsets:
+                    raise AssertionError("event iteration before resource rejection")
+            return forbid_iteration
+
+        for deleted_fields in (256, 4_096, 65_536, 262_144):
+            for position in (0, 4):
+                with self.subTest(deleted_fields=deleted_fields, position=position):
+                    raw = {f"gone-{index}": None for index in range(deleted_fields)}
+                    raw.update(cycle()[position])
+                    for index in range(deleted_fields):
+                        del raw[f"gone-{index}"]
+                    self.assertEqual(len(raw), 3 if position == 0 else 4)
+                    self.assertGreater(dict.__sizeof__(raw), 1_024)
+                    seq = cycle()
+                    seq[position] = raw
+                    previous_trace = sys.gettrace()
+                    try:
+                        sys.settrace(forbid_iteration)
+                        with self.assertRaisesRegex(InvalidCanaryTrace, "event_dict_too_large"):
+                            _event(raw)
+                        report = self.blocked(seq)
+                    finally:
+                        sys.settrace(previous_trace)
+                    self.assertEqual(
+                        report["reasons"], [f"event_{position}:event_dict_too_large"]
+                    )
+
+    def test_compact_native_instance_dictionaries_remain_valid(self):
+        class Record:
+            pass
+
+        seq = []
+        for template in cycle():
+            record = Record()
+            for key, value in template.items():
+                setattr(record, key, value)
+            raw = record.__dict__
+            self.assertIs(type(raw), dict)
+            self.assertLessEqual(dict.__sizeof__(raw), MAX_EVENT_DICT_BYTES)
+            self.assertIs(_event(raw), raw)
+            seq.append(raw)
+        self.assertEqual(self.replay(seq)["status"], "SYNTHETIC_TERMINAL_OBSERVED")
+
+    def test_dictionary_size_budget_accepts_and_rejects_adjacent_table_capacities(self):
+        self.assertEqual(MAX_EVENT_DICT_BYTES, 1_024)
+        for position in (0, 4):
+            with self.subTest(position=position):
+                below = None
+                for deleted_fields in range(MAX_EVENT_DICT_BYTES):
+                    raw = {f"gone-{index}": None for index in range(deleted_fields)}
+                    raw.update(cycle()[position])
+                    for index in range(deleted_fields):
+                        del raw[f"gone-{index}"]
+                    if dict.__sizeof__(raw) > MAX_EVENT_DICT_BYTES:
+                        break
+                    below = raw
+                else:
+                    self.fail("no native table capacity above the fixed byte budget")
+                self.assertIsNotNone(below)
+                self.assertLessEqual(dict.__sizeof__(below), MAX_EVENT_DICT_BYTES)
+                self.assertIs(_event(below), below)
+                seq = cycle()
+                seq[position] = below
+                self.assertEqual(self.replay(seq)["status"], "SYNTHETIC_TERMINAL_OBSERVED")
+                self.assertGreater(dict.__sizeof__(raw), MAX_EVENT_DICT_BYTES)
+                seq[position] = raw
+                report = self.blocked(seq)
+                self.assertEqual(report["reasons"], [f"event_{position}:event_dict_too_large"])
+
+    def test_size_check_does_not_call_key_or_value_callbacks(self):
+        callback = Mock(side_effect=RuntimeError("unexpected size callback"))
+
+        class CustomValue:
+            __sizeof__ = callback
+
+        raw = cycle()[0]
+        raw["intent_id"] = CustomValue()
+        self.assertEqual(self.blocked([raw])["reasons"], ["event_0:invalid_reference"])
+
+        for operation in ("eq", "hash"):
+            with self.subTest(operation=operation):
+                key = CallbackString("type")
+                raw = {f"gone-{index}": None for index in range(4_096)}
+                raw.update({key: "intent_recorded", **pins()})
+                raw["intent_id"] = CustomValue()
+                for index in range(4_096):
+                    del raw[f"gone-{index}"]
+                key.calls.clear()
+                key.raise_on = operation
+                report = self.blocked([raw])
+                self.assertEqual(report["reasons"], ["event_0:event_dict_too_large"])
+                self.assertEqual(key.calls, [])
+        callback.assert_not_called()
+
+    def test_custom_dictionary_size_callback_is_never_invoked(self):
+        callback = Mock(side_effect=RuntimeError("unexpected dictionary size callback"))
+
+        class CustomDict(dict):
+            __sizeof__ = callback
+
+        report = self.blocked([CustomDict(cycle()[0])])
+        self.assertEqual(report["reasons"], ["event_0:invalid_event_object"])
+        callback.assert_not_called()
+
+    def test_unsupported_dictionary_runtimes_are_blocked(self):
+        for name, version in (("pypy", (3, 11)), ("cpython", (3, 10)), ("cpython", (3, 14))):
+            with self.subTest(name=name, version=version):
+                with patch("developer_team.agents_canary_replay.sys") as runtime:
+                    runtime.implementation.name = name
+                    runtime.version_info = version
+                    report = self.blocked([cycle()[0]])
+                self.assertEqual(report["reasons"], ["event_0:unsupported_dict_runtime"])
 
     def test_overlong_event_kinds_are_blocked_before_schema_operations(self):
         for kind in ("agent.session.turn.completedx", "x" * 4_096, "x" * 65_536):

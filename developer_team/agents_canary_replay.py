@@ -7,6 +7,7 @@ Input data is untrusted, and even a complete trace is not remote attestation.
 from __future__ import annotations
 
 import re
+import sys
 
 MAX_EVENTS = 64
 MAX_AMOUNT_CENTS = 1_000_000_000
@@ -26,6 +27,9 @@ _FIELDS = {
 }
 MAX_EVENT_FIELDS = max(len(fields) for fields in _FIELDS.values())
 MAX_EVENT_KIND_LENGTH = max(map(len, _FIELDS))
+# CPython 3.11-3.13: native __sizeof__ is O(1) and counts private table capacity,
+# including tombstones. 1 KiB accommodates compact Unicode/general-key dicts.
+MAX_EVENT_DICT_BYTES = 1_024
 _TERMINAL = frozenset(
     {
         "agent.session.turn.completed",
@@ -48,6 +52,10 @@ def _event(value: object) -> dict:
         raise InvalidCanaryTrace("invalid_event_object")
     if len(value) > MAX_EVENT_FIELDS:
         raise InvalidCanaryTrace("too_many_event_fields")
+    if sys.implementation.name != "cpython" or not (3, 11) <= sys.version_info[:2] <= (3, 13):
+        raise InvalidCanaryTrace("unsupported_dict_runtime")
+    if dict.__sizeof__(value) > MAX_EVENT_DICT_BYTES:
+        raise InvalidCanaryTrace("event_dict_too_large")
     # Native dict iteration does not hash or compare keys; reject custom keys first.
     for key in value:
         if type(key) is not str:
