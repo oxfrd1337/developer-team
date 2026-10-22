@@ -16,8 +16,7 @@ from uuid import UUID, uuid4
 from .adapters.cloud_agents import CloudPreviewDelivery, CodexCloudAgents, cloud_authority
 from .adapters.cloud_contracts import CloudApproval, fields, strict_json
 from .adapters.cloud_results import CloudResultImporter
-from .adapters.codex_cloud import CodexCloudGateway
-from .adapters.pilot_fake import PILOT_WRITABLE, RehearsalCLI, RehearsalRefs
+from .adapters.pilot_fake import PILOT_WRITABLE, RehearsalCloudGateway
 from .authority import ProjectGrant, RuntimePolicy
 from .config import load_config
 from .engine import Engine
@@ -215,10 +214,11 @@ def rehearsal_engine(root: Path, session: dict) -> Engine:
         cloud_environments=tuple((role, "simulated-" + role.value) for role in Role),
     )
     policy = RuntimePolicy(False, False, True, PILOT_REPOSITORY)
-    gateway = CodexCloudGateway(
-        RehearsalCLI(workspace, store, session["run_id"], session["scenario"]),
-        store=store,
-        refs=RehearsalRefs(workspace),
+    gateway = RehearsalCloudGateway(
+        workspace,
+        store,
+        session["run_id"],
+        session["scenario"],
         now=lambda: session["simulation_time"],
     )
     agents = CodexCloudAgents(gateway, approval, grant, policy)

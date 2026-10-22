@@ -373,7 +373,8 @@ class CodexProbeTests(unittest.TestCase):
         return "--env --branch --json TASK_ID"
 
     def test_login_output_is_never_included_in_probe_report(self):
-        report = CodexCloudGateway(self.runner).probe()
+        with patch("developer_team.adapters.codex_cloud.run_cli", self.runner):
+            report = CodexCloudGateway().probe()
         self.assertNotIn("sensitive-key-fragment", json.dumps(report))
         self.assertFalse(report["chatgpt_login_reported"])
         self.assertFalse(report["unattended_cloud_auth_verified"])
@@ -385,7 +386,8 @@ class CodexProbeTests(unittest.TestCase):
                 raise IntegrationUnavailable("No login")
             return self.runner(argv)
 
-        report = CodexCloudGateway(missing_login).probe()
+        with patch("developer_team.adapters.codex_cloud.run_cli", missing_login):
+            report = CodexCloudGateway().probe()
         self.assertTrue(report["submit_interface_present"])
         self.assertFalse(report["chatgpt_login_reported"])
         self.assertFalse(report["remote_task_verified"])

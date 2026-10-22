@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 from developer_team.adapters.cloud_agents import CodexCloudAgents, cloud_authority
 from developer_team.adapters.cloud_contracts import strict_json
-from developer_team.adapters.codex_cloud import CodexCloudGateway, run_cli
+from developer_team.adapters.codex_cloud import run_cli
 from developer_team.adapters.github import GitHubCloudRefs
 from developer_team.adapters.synthetic import REQUIREMENT
 from developer_team.engine import Engine
@@ -21,7 +21,7 @@ from developer_team.models import (
     TeamError,
 )
 from developer_team.store import RunStore
-from tests.cloud_support import cloud_harness, patch_for
+from tests.cloud_support import FixtureCloudGateway, cloud_harness, patch_for
 
 
 class CloudLifecycleTests(unittest.TestCase):
@@ -76,7 +76,7 @@ class CloudLifecycleTests(unittest.TestCase):
         with self.assertRaises(CloudPending):
             self.collect()
         store = RunStore(self.gateway.store.path)
-        gateway = CodexCloudGateway(self.cli, store=store, refs=self.refs, now=self.clock)
+        gateway = FixtureCloudGateway(self.cli, store=store, refs=self.refs, now=self.clock)
         self.clock.advance()
         second = gateway.submit(**self.kwargs)
         self.assertEqual(second.task_id, receipt.task_id)
@@ -342,7 +342,7 @@ class CloudEngineTests(unittest.TestCase):
         self.assertEqual(run.status, RunStatus.PAUSED)
         self.assertEqual(len(self.cli.submissions), 4)
         store = RunStore(self.engine.store.path)
-        gateway = CodexCloudGateway(self.cli, store=store, refs=self.refs, now=self.clock)
+        gateway = FixtureCloudGateway(self.cli, store=store, refs=self.refs, now=self.clock)
         agents = CodexCloudAgents(
             gateway, self.engine.agents.approval, self.engine.grant, self.engine.policy
         )

@@ -9,6 +9,18 @@ from datetime import UTC, datetime
 from ..models import Role, TeamError
 from ..pilot_scope import PILOT_WRITABLE
 from .cloud_contracts import RESULT_PATH, CloudJob
+from .offline_cloud import _OfflineCloudLifecycle
+
+
+class RehearsalCloudGateway(_OfflineCloudLifecycle):
+    """Fixed model-free transport. No callable runner or production-gateway base."""
+
+    def __init__(self, workspace, store, run_id, scenario, *, now):
+        super().__init__(store=store, refs=RehearsalRefs(workspace), now=now)
+        self._fixture = RehearsalCLI(workspace, store, run_id, scenario)
+
+    def _request(self, argv: list[str]) -> str:
+        return RehearsalCLI.__call__(self._fixture, argv)
 
 
 def _patch(path: str, old: str | None, new: str) -> str:
