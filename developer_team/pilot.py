@@ -215,7 +215,10 @@ def rehearsal_engine(root: Path, session: dict) -> Engine:
     )
     policy = RuntimePolicy(False, False, True, PILOT_REPOSITORY)
     gateway = RehearsalCloudGateway(
-        workspace, store, session["run_id"], session["scenario"],
+        workspace,
+        store,
+        session["run_id"],
+        session["scenario"],
         now=lambda: session["simulation_time"],
     )
     agents = CodexCloudAgents(gateway, approval, grant, policy)

@@ -53,7 +53,7 @@ class CloudStartBoundaryTests(unittest.TestCase):
 
     def assert_blocked(self, **changes):
         with (
-            patch("subprocess.Popen") as process,
+            patch("subprocess.Popen", side_effect=AssertionError) as process,
             patch("developer_team.adapters.codex_cloud.run_cli") as cli,
         ):
             with self.assertRaisesRegex(PermissionDenied, "DT-008 NO-GO"):
@@ -68,7 +68,10 @@ class CloudStartBoundaryTests(unittest.TestCase):
 
     def test_constructor_rejects_all_callable_runner_forms(self):
         for runner in (run_cli, lambda argv: run_cli(argv), partial(run_cli), ForwardingCallable()):
-            with self.subTest(runner=type(runner).__name__), patch("subprocess.Popen") as process:
+            with (
+                self.subTest(runner=type(runner).__name__),
+                patch("subprocess.Popen", side_effect=AssertionError) as process,
+            ):
                 with self.assertRaises(TypeError):
                     CodexCloudGateway(runner, store=self.store, refs=self.refs)
                 with self.assertRaises(TypeError):
@@ -104,7 +107,7 @@ class CloudStartBoundaryTests(unittest.TestCase):
                 self.assert_blocked(**changes)
 
     def test_production_collection_is_also_closed_before_journal_or_transport(self):
-        with patch("subprocess.Popen") as process:
+        with patch("subprocess.Popen", side_effect=AssertionError) as process:
             with self.assertRaisesRegex(PermissionDenied, "DT-008 NO-GO"):
                 self.gateway.collect(self.kwargs["job"], self.kwargs["approval"])
             process.assert_not_called()
@@ -118,7 +121,10 @@ class CloudStartBoundaryTests(unittest.TestCase):
             _OfflineCloudLifecycle(runner=ForwardingCallable(), store=None, refs=None)
         with self.assertRaises(TypeError):
             RehearsalCloudGateway(runner=ForwardingCallable())
-        with self.assertRaises(TypeError), patch("subprocess.Popen") as process:
+        with (
+            self.assertRaises(TypeError),
+            patch("subprocess.Popen", side_effect=AssertionError) as process,
+        ):
             _OfflineCloudLifecycle(store=None, refs=None)
         process.assert_not_called()
 
@@ -135,7 +141,7 @@ class CloudStartBoundaryTests(unittest.TestCase):
         ):
             with (
                 self.subTest(forward=type(forward).__name__),
-                patch("subprocess.Popen") as process,
+                patch("subprocess.Popen", side_effect=AssertionError) as process,
                 patch("developer_team.adapters.codex_cloud.run_cli") as cli,
             ):
                 runner = Mock(wraps=forward)

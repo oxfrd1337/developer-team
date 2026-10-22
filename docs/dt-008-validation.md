@@ -105,6 +105,14 @@ sanitisierte CLI-Probe und lesender Preflight sind ausführbar; Preflight bleibt
 BLOCKED / NO-GO. Endgültiger neuer CI-Run samt finalem HEAD wird im Draft-PR #11
 nachvollziehbar ergänzt; kein neuer PR und kein Merge.
 
+Erster CI-Versuch der Reviewkorrektur:
+[Run 39750273338 / #28](https://github.com/oxfrd1337/developer-team/actions/runs/39750273338),
+HEAD `b7f8444830e1988dfef2f79cb2efc599ba31c55c`. CLI-Probe und beide
+Checkpoint-/Restorejobs erfolgreich; drei Qualitätsjobs beim Ruffcheck wegen eines
+nach der Fixtureumstellung ungenutzten `RehearsalCLI`-Imports gescheitert (F401).
+Der Import wurde entfernt und die Konstruktorformatierung vereinheitlicht. Keine
+Regel oder Workflowbedingung wurde geändert; dieser Lauf ist kein grüner Gesamtnachweis.
+
 ## Nicht verfügbare echte Abnahmen
 
 Alle folgenden Kontrollen bleiben **UNSUPPORTED**, niemals PASS: vier unabhängige
