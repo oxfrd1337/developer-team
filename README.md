@@ -1,5 +1,11 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
+## DT-012 V0.1: synthetischer Agents-API-Canary-Replay
+
+[Reproduzierbarer Lebenszyklus-Prüfer ohne API-Aufrufe](docs/dt-012-canary-replay.md):
+einmaliger Submit, unklare Providerantwort, Wiederaufnahme und behaupteter Turnabschluss.
+**Nur künstliche Ereignisse und Negativtests; keine Cloud-, Billing-, Stop- oder Mergefreigabe.**
+
 ## DT-011 V0: Betriebsweg zu kontrollierter Automatisierung (nur Design)
 
 [Vergleich Agents API, bestehender Codex Cloud und Codex SDK/app-server](docs/dt-011-provider-path.md)
