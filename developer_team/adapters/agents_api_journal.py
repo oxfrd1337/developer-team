@@ -78,10 +78,9 @@ class SQLiteCanaryJournal:
             raise AgentsAPIError("invalid_journal_record")
         try:
             value = json.loads(row[2], object_pairs_hook=pairs)
-            if (
-                type(value) is not dict
-                or set(value) != {field.name for field in fields(CanaryState)}
-            ):
+            if type(value) is not dict or set(value) != {
+                field.name for field in fields(CanaryState)
+            }:
                 raise ValueError
             state = CanaryState(**value)
         except (ValueError, TypeError, RecursionError):

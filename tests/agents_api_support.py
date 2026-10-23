@@ -23,24 +23,45 @@ TURN = "turn_synthetic"
 
 
 def binding(**changes):
-    return replace(CanaryBinding(
-        project_id="proj_synthetic", agent_id="agent_synthetic", intent_id="intent_synthetic",
-        idempotency_key="key_synthetic", plan_digest="a" * 64, budget_cents=5,
-    ), **changes)
+    return replace(
+        CanaryBinding(
+            project_id="proj_synthetic",
+            agent_id="agent_synthetic",
+            intent_id="intent_synthetic",
+            idempotency_key="key_synthetic",
+            plan_digest="a" * 64,
+            budget_cents=5,
+        ),
+        **changes,
+    )
 
 
 def permit(bound=None, **changes):
     bound = binding() if bound is None else bound
-    return replace(ExternalPermit(
-        binding_digest=bound.digest, project_id=bound.project_id,
-        credential_project_id=bound.project_id, agent_id=bound.agent_id,
-        key_capabilities=MINIMAL_CAPABILITIES, project_capabilities=MINIMAL_CAPABILITIES,
-        project_hard_limit_cents=5, observed_at=NOW, expires_at=NOW + 300,
-        grant_binding_digest=bound.digest, grant_budget_cents=5,
-        grant_issued_at=NOW, grant_expires_at=NOW + 300, submit_approved_at=NOW,
-        secret_store_verified=True, spend_controls_verified=True, contract_verified=True,
-        agent_configuration_verified=True, operator_grant_verified=True,
-    ), **changes)
+    return replace(
+        ExternalPermit(
+            binding_digest=bound.digest,
+            project_id=bound.project_id,
+            credential_project_id=bound.project_id,
+            agent_id=bound.agent_id,
+            key_capabilities=MINIMAL_CAPABILITIES,
+            project_capabilities=MINIMAL_CAPABILITIES,
+            project_hard_limit_cents=5,
+            observed_at=NOW,
+            expires_at=NOW + 300,
+            grant_binding_digest=bound.digest,
+            grant_budget_cents=5,
+            grant_issued_at=NOW,
+            grant_expires_at=NOW + 300,
+            submit_approved_at=NOW,
+            secret_store_verified=True,
+            spend_controls_verified=True,
+            contract_verified=True,
+            agent_configuration_verified=True,
+            operator_grant_verified=True,
+        ),
+        **changes,
+    )
 
 
 class FixtureGate:
@@ -73,16 +94,27 @@ class FixtureTransport:
         self.created = False
         self.turn_status = None
         self.session = {
-            "id": SESSION, "object": "agent.session", "status": "idle",
-            "agent": {"id": bound.agent_id, "tools": [], "instructions": CANARY_INSTRUCTIONS,
-                      "multi_agent": {"enabled": False}},
-            "environment": {"type": "openai_hosted"}, "vault_ids": [], "required_actions": [],
+            "id": SESSION,
+            "object": "agent.session",
+            "status": "idle",
+            "agent": {
+                "id": bound.agent_id,
+                "tools": [],
+                "instructions": CANARY_INSTRUCTIONS,
+                "multi_agent": {"enabled": False},
+            },
+            "environment": {"type": "openai_hosted"},
+            "vault_ids": [],
+            "required_actions": [],
             "metadata": {"dt016_binding": bound.digest},
             "spend_control": {"limit": bound.budget_cents, "consumed": 0},
         }
         self.turn = {
-            "id": TURN, "object": "agent.session.turn", "session_id": SESSION,
-            "agent_id": bound.agent_id, "subagent_id": None,
+            "id": TURN,
+            "object": "agent.session.turn",
+            "session_id": SESSION,
+            "agent_id": bound.agent_id,
+            "subagent_id": None,
         }
         self.before_response = None
 
@@ -147,9 +179,15 @@ class Harness:
 
     def restart(self, **changes):
         return AgentsAPIAdapter(
-            self.binding, self.journal,
-            **{"transport": self.transport, "gate": self.gate, "limits": self.limits,
-               "now": lambda: NOW, **changes},
+            self.binding,
+            self.journal,
+            **{
+                "transport": self.transport,
+                "gate": self.gate,
+                "limits": self.limits,
+                "now": lambda: NOW,
+                **changes,
+            },
         )
 
     def active(self):

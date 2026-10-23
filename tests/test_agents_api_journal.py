@@ -29,15 +29,21 @@ class AgentsAPIJournalTests(unittest.TestCase):
 
     def test_all_binding_components_and_message_key_are_pinned_on_restart(self):
         for changes in (
-            {"project_id": "proj_other"}, {"agent_id": "agent_other"},
-            {"intent_id": "intent_other"}, {"idempotency_key": "key_other"},
-            {"plan_digest": "b" * 64}, {"budget_cents": 6},
+            {"project_id": "proj_other"},
+            {"agent_id": "agent_other"},
+            {"intent_id": "intent_other"},
+            {"idempotency_key": "key_other"},
+            {"plan_digest": "b" * 64},
+            {"budget_cents": 6},
         ):
             with self.subTest(changes=changes):
                 bound = binding(**changes)
                 adapter = AgentsAPIAdapter(
-                    bound, self.h.journal, transport=self.h.transport,
-                    gate=FixtureGate(), now=lambda: NOW,
+                    bound,
+                    self.h.journal,
+                    transport=self.h.transport,
+                    gate=FixtureGate(),
+                    now=lambda: NOW,
                 )
                 with self.assertRaises(AgentsAPIError):
                     adapter.create_session()
@@ -222,8 +228,11 @@ class AgentsAPIJournalTests(unittest.TestCase):
             restored = sqlite3.connect(path)
             try:
                 adapter = AgentsAPIAdapter(
-                    binding(), SQLiteCanaryJournal(restored), transport=self.h.transport,
-                    gate=self.h.gate, now=lambda: NOW,
+                    binding(),
+                    SQLiteCanaryJournal(restored),
+                    transport=self.h.transport,
+                    gate=self.h.gate,
+                    now=lambda: NOW,
                 )
                 adapter.submit_canary()
                 with self.assertRaises(AgentsAPIError):
@@ -236,13 +245,22 @@ class AgentsAPIJournalTests(unittest.TestCase):
     def test_tampered_fields_references_authority_and_counters_fail_closed_without_echo(self):
         original = asdict(self.h.state())
         for changes in (
-            {"idempotency_key": "key_other"}, {"message_digest": "b" * 64},
-            {"binding_digest": "b" * 64}, {"phase": "TERMINAL"},
-            {"session_attempts": True}, {"message_attempts": 2}, {"cancel_attempts": 1},
-            {"turn_id": "turn_without_session"}, {"request_count": 33},
-            {"terminal_kind": "agent.session.idle"}, {"budget_exceeded": 1},
-            {"consumed_cents": "NaN"}, {"consumed_cents": "-1"},
-            {"api_key": "sk-secret-marker"}, {"live_authorized": True}, {"real_submissions": 1},
+            {"idempotency_key": "key_other"},
+            {"message_digest": "b" * 64},
+            {"binding_digest": "b" * 64},
+            {"phase": "TERMINAL"},
+            {"session_attempts": True},
+            {"message_attempts": 2},
+            {"cancel_attempts": 1},
+            {"turn_id": "turn_without_session"},
+            {"request_count": 33},
+            {"terminal_kind": "agent.session.idle"},
+            {"budget_exceeded": 1},
+            {"consumed_cents": "NaN"},
+            {"consumed_cents": "-1"},
+            {"api_key": "sk-secret-marker"},
+            {"live_authorized": True},
+            {"real_submissions": 1},
         ):
             with self.subTest(fields=list(changes)):
                 value = {**copy.deepcopy(original), **changes}
@@ -264,7 +282,11 @@ class AgentsAPIJournalTests(unittest.TestCase):
 
     def test_injected_journal_cannot_return_unvalidated_objects(self):
         for result in (
-            None, {}, (0, {}), (True, self.h.state()), (0, replace(self.h.state(), phase="GO"))
+            None,
+            {},
+            (0, {}),
+            (True, self.h.state()),
+            (0, replace(self.h.state(), phase="GO")),
         ):
             adapter = self.h.restart()
             adapter._journal = Mock()

@@ -54,7 +54,9 @@ def _json(raw: bytes) -> dict:
     value = None
     try:
         value = json.loads(
-            raw, object_pairs_hook=pairs, parse_float=Decimal,
+            raw,
+            object_pairs_hook=pairs,
+            parse_float=Decimal,
             parse_constant=invalid_constant,
         )
     except (ValueError, RecursionError, ArithmeticError, UnicodeError):
@@ -128,8 +130,10 @@ class AgentsAPIAdapter:
         except Exception:
             result = None
         if (
-            type(result) is not tuple or len(result) != 2
-            or not bounded_int(result[0], 0, 1000) or type(result[1]) is not CanaryState
+            type(result) is not tuple
+            or len(result) != 2
+            or not bounded_int(result[0], 0, 1000)
+            or type(result[1]) is not CanaryState
         ):
             raise AgentsAPIError("journal_unavailable_or_invalid")
         result[1].validate(self._binding)
@@ -150,8 +154,15 @@ class AgentsAPIAdapter:
         return revision + 1, state
 
     def _request(
-        self, revision: int, state: CanaryState, method: str, path: str,
-        body: dict | None = None, *, message_key: bool = False, expected_status: int = 200,
+        self,
+        revision: int,
+        state: CanaryState,
+        method: str,
+        path: str,
+        body: dict | None = None,
+        *,
+        message_key: bool = False,
+        expected_status: int = 200,
     ) -> tuple[int, CanaryState, WireResponse]:
         if state.request_count >= self._limits.max_requests:
             raise AgentsAPIError("request_budget_exhausted")
@@ -159,15 +170,20 @@ class AgentsAPIAdapter:
             revision, replace(state, request_count=state.request_count + 1)
         )
         headers = (
-            ("OpenAI-Beta", "agents=v1"), ("OpenAI-Project", self._binding.project_id),
+            ("OpenAI-Beta", "agents=v1"),
+            ("OpenAI-Project", self._binding.project_id),
             ("Content-Type", "application/json"),
         )
         if message_key:
             headers += (("Idempotency-Key", state.idempotency_key),)
         started = self._monotonic()
         request = WireRequest(
-            method, PROVIDER_BASE + path, headers, None if body is None else canonical(body),
-            started + self._limits.timeout_seconds, self._limits.response_bytes,
+            method,
+            PROVIDER_BASE + path,
+            headers,
+            None if body is None else canonical(body),
+            started + self._limits.timeout_seconds,
+            self._limits.response_bytes,
         )
         results = queue.Queue(maxsize=1)
         transport = self._transport
@@ -205,7 +221,8 @@ class AgentsAPIAdapter:
             raise AgentsAPIError("provider_response_size_exceeded")
         if type(response.status) is not int or response.status != expected_status:
             reason = {
-                401: "provider_unauthorized", 403: "provider_forbidden",
+                401: "provider_unauthorized",
+                403: "provider_forbidden",
                 429: "provider_rate_or_spend_limited",
             }.get(response.status if type(response.status) is int else 0, "provider_http_refused")
             raise AgentsAPIError(reason)
@@ -239,15 +256,19 @@ class AgentsAPIAdapter:
         multi_agent = agent.get("multi_agent") if type(agent) is dict else None
         status = value.get("status")
         if (
-            value.get("object") != "agent.session" or not safe_ref(identifier)
+            value.get("object") != "agent.session"
+            or not safe_ref(identifier)
             or (state.session_id is not None and identifier != state.session_id)
             or value.get("metadata") != self._metadata
             or value.get("project_id", self._binding.project_id) != self._binding.project_id
-            or type(agent) is not dict or agent.get("id") != self._binding.agent_id
-            or agent.get("tools") != [] or type(multi_agent) is not dict
+            or type(agent) is not dict
+            or agent.get("id") != self._binding.agent_id
+            or agent.get("tools") != []
+            or type(multi_agent) is not dict
             or multi_agent.get("enabled") is not False
             or agent.get("instructions") != CANARY_INSTRUCTIONS
-            or type(environment) is not dict or environment.get("type") != "openai_hosted"
+            or type(environment) is not dict
+            or environment.get("type") != "openai_hosted"
             or value.get("vault_ids") != []
             or type(status) is not str
             or status not in {"idle", "in_progress", "requires_action", "failed"}
@@ -255,13 +276,15 @@ class AgentsAPIAdapter:
             raise AgentsAPIError("provider_session_binding_mismatch")
         spend = value.get("spend_control")
         if (
-            type(spend) is not dict or type(spend.get("limit")) is not int
+            type(spend) is not dict
+            or type(spend.get("limit")) is not int
             or spend["limit"] != self._binding.budget_cents
         ):
             raise AgentsAPIError("provider_spend_control_mismatch")
         consumed = spend.get("consumed")
         if (
-            type(consumed) not in {int, Decimal} or not Decimal(consumed).is_finite()
+            type(consumed) not in {int, Decimal}
+            or not Decimal(consumed).is_finite()
             or not 0 <= consumed <= 1_000_000_000
         ):
             raise AgentsAPIError("invalid_provider_spend_observation")
@@ -274,9 +297,10 @@ class AgentsAPIAdapter:
         value = _json(response.body)
         _, consumed, exceeded = self._session(value, state)
         revision, state = self._commit(
-            revision, replace(
+            revision,
+            replace(
                 state, consumed_cents=consumed, budget_exceeded=state.budget_exceeded or exceeded
-            )
+            ),
         )
         return revision, state, value
 
@@ -284,8 +308,10 @@ class AgentsAPIAdapter:
         self, revision: int, state: CanaryState, session_id: str
     ) -> tuple[int, CanaryState, list[dict]]:
         revision, state, response = self._request(
-            revision, state, "GET",
-            f"{SESSIONS_PATH}/{session_id}/turns?limit={self._limits.max_records}&order=asc"
+            revision,
+            state,
+            "GET",
+            f"{SESSIONS_PATH}/{session_id}/turns?limit={self._limits.max_records}&order=asc",
         )
         turns = self._page(response.body)
         if len(turns) > 1 or (turns and state.message_attempts == 0):
@@ -301,15 +327,20 @@ class AgentsAPIAdapter:
             revision, replace(state, phase="SESSION_UNCERTAIN", session_attempts=1)
         )
         revision, state, response = self._request(
-            revision, state, "POST", SESSIONS_PATH,
+            revision,
+            state,
+            "POST",
+            SESSIONS_PATH,
             {
                 "agent_id": self._binding.agent_id,
                 "agent": {
-                    "instructions": CANARY_INSTRUCTIONS, "tools": [],
+                    "instructions": CANARY_INSTRUCTIONS,
+                    "tools": [],
                     "multi_agent": {"enabled": False},
                 },
                 "environment": {"type": "openai_hosted"},
-                "metadata": self._metadata, "spend_control": {"limit": self._binding.budget_cents},
+                "metadata": self._metadata,
+                "spend_control": {"limit": self._binding.budget_cents},
                 "stream": False,
             },
             expected_status=201,
@@ -318,10 +349,16 @@ class AgentsAPIAdapter:
         identifier, consumed, exceeded = self._session(value, state)
         if value.get("status") != "idle" or value.get("required_actions") != []:
             raise AgentsAPIError("session_not_empty_and_idle")
-        _, state = self._commit(revision, replace(
-            state, phase="SESSION_READY", session_id=identifier, consumed_cents=consumed,
-            budget_exceeded=exceeded,
-        ))
+        _, state = self._commit(
+            revision,
+            replace(
+                state,
+                phase="SESSION_READY",
+                session_id=identifier,
+                consumed_cents=consumed,
+                budget_exceeded=exceeded,
+            ),
+        )
         return _report(state)
 
     def submit_canary(self) -> dict:
@@ -332,8 +369,10 @@ class AgentsAPIAdapter:
         revision, state, session = self._read_session(revision, state)
         revision, state, _ = self._read_turns(revision, state, state.session_id)
         if (
-            session.get("status") != "idle" or session.get("required_actions") != []
-            or state.budget_exceeded or Decimal(state.consumed_cents) >= self._binding.budget_cents
+            session.get("status") != "idle"
+            or session.get("required_actions") != []
+            or state.budget_exceeded
+            or Decimal(state.consumed_cents) >= self._binding.budget_cents
         ):
             raise AgentsAPIError("session_not_empty_idle_or_within_budget")
         # Recheck immediately before reserving the first logical message.
@@ -342,10 +381,25 @@ class AgentsAPIAdapter:
             revision, replace(state, phase="MESSAGE_UNCERTAIN", message_attempts=1)
         )
         revision, state, _ = self._request(
-            revision, state, "POST", f"{SESSIONS_PATH}/{state.session_id}/events",
-            {"events": [{"type": "agent.session.input.message", "input": [{
-                "role": "user", "content": [{"type": "input_text", "text": CANARY_MESSAGE}],
-            }]}]}, message_key=True, expected_status=202,
+            revision,
+            state,
+            "POST",
+            f"{SESSIONS_PATH}/{state.session_id}/events",
+            {
+                "events": [
+                    {
+                        "type": "agent.session.input.message",
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [{"type": "input_text", "text": CANARY_MESSAGE}],
+                            }
+                        ],
+                    }
+                ]
+            },
+            message_key=True,
+            expected_status=202,
         )
         _, state = self._commit(revision, replace(state, phase="MESSAGE_ACCEPTED"))
         return _report(state)
@@ -360,27 +414,28 @@ class AgentsAPIAdapter:
         turn = turns[0]
         identifier, status = turn.get("id"), turn.get("status")
         if (
-            turn.get("object") != "agent.session.turn" or not safe_ref(identifier)
+            turn.get("object") != "agent.session.turn"
+            or not safe_ref(identifier)
             or turn.get("session_id") != state.session_id
-            or turn.get("agent_id") != self._binding.agent_id or turn.get("subagent_id") is not None
+            or turn.get("agent_id") != self._binding.agent_id
+            or turn.get("subagent_id") is not None
             or (state.turn_id is not None and identifier != state.turn_id)
-            or type(status) is not str or status not in {
-                "queued", "in_progress", "waiting", "completed", "failed", "cancelled"
-            }
+            or type(status) is not str
+            or status
+            not in {"queued", "in_progress", "waiting", "completed", "failed", "cancelled"}
         ):
             raise AgentsAPIError("provider_turn_binding_mismatch")
         terminal = (
             f"agent.session.turn.{status}"
-            if status in {"completed", "failed", "cancelled"} else None
+            if status in {"completed", "failed", "cancelled"}
+            else None
         )
         if state.terminal_kind is not None and terminal != state.terminal_kind:
             raise AgentsAPIError("conflicting_or_regressed_terminal")
-        phase = "TERMINAL" if terminal else (
-            state.phase if state.cancel_attempts else "TURN_BOUND"
+        phase = "TERMINAL" if terminal else (state.phase if state.cancel_attempts else "TURN_BOUND")
+        return self._commit(
+            revision, replace(state, turn_id=identifier, terminal_kind=terminal, phase=phase)
         )
-        return self._commit(revision, replace(
-            state, turn_id=identifier, terminal_kind=terminal, phase=phase
-        ))
 
     def reconcile(self) -> dict:
         self._authorize("reconcile")
@@ -389,11 +444,14 @@ class AgentsAPIAdapter:
             raise AgentsAPIError("no_session_attempt_to_reconcile")
         if state.session_id is None:
             revision, state, response = self._request(
-                revision, state, "GET",
-                f"{SESSIONS_PATH}?limit={self._limits.max_records}&order=desc"
+                revision,
+                state,
+                "GET",
+                f"{SESSIONS_PATH}?limit={self._limits.max_records}&order=desc",
             )
             candidates = [
-                record for record in self._page(response.body)
+                record
+                for record in self._page(response.body)
                 if record.get("metadata") == self._metadata
             ]
             if len(candidates) != 1:
@@ -402,10 +460,16 @@ class AgentsAPIAdapter:
             if candidates[0].get("status") != "idle" or candidates[0].get("required_actions") != []:
                 raise AgentsAPIError("session_not_empty_and_idle")
             revision, state, _ = self._read_turns(revision, state, identifier)
-            _, state = self._commit(revision, replace(
-                state, session_id=identifier, phase="SESSION_READY", consumed_cents=consumed,
-                budget_exceeded=exceeded,
-            ))
+            _, state = self._commit(
+                revision,
+                replace(
+                    state,
+                    session_id=identifier,
+                    phase="SESSION_READY",
+                    consumed_cents=consumed,
+                    budget_exceeded=exceeded,
+                ),
+            )
         else:
             _, state = self._reconcile_turn(revision, state)
         return _report(state)
@@ -422,8 +486,12 @@ class AgentsAPIAdapter:
             revision, replace(state, phase="CANCEL_UNCERTAIN", cancel_attempts=1)
         )
         revision, state, _ = self._request(
-            revision, state, "POST", f"{SESSIONS_PATH}/{state.session_id}/events",
-            {"events": [{"type": "agent.session.input.cancel"}]}, expected_status=202,
+            revision,
+            state,
+            "POST",
+            f"{SESSIONS_PATH}/{state.session_id}/events",
+            {"events": [{"type": "agent.session.input.cancel"}]},
+            expected_status=202,
         )
         _, state = self._commit(revision, replace(state, phase="CANCEL_REQUESTED"))
         return _report(state)

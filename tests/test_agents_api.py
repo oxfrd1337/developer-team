@@ -64,7 +64,10 @@ class AgentsAPIContractTests(unittest.TestCase):
         adapter.enabled = True
         adapter.live_authorized = True
         for operation in (
-            adapter.create_session, adapter.submit_canary, adapter.reconcile, adapter.cancel
+            adapter.create_session,
+            adapter.submit_canary,
+            adapter.reconcile,
+            adapter.cancel,
         ):
             self.blocked(operation, "disabled")
         journal.assert_not_called()
@@ -82,7 +85,8 @@ class AgentsAPIContractTests(unittest.TestCase):
             evaluate_agents_live_preflight(synthetic_reference_plan()),
             evaluate_readonly_evidence(
                 synthetic_reference_evidence(NOW),
-                expected_project_ref="synthetic-test-project", now=NOW
+                expected_project_ref="synthetic-test-project",
+                now=NOW,
             ),
             {**asdict(permit()), "live_authorized": True},
         )
@@ -119,9 +123,22 @@ class AgentsAPIContractTests(unittest.TestCase):
         self.assertEqual(dict(request.headers)["Idempotency-Key"], self.h.binding.idempotency_key)
         self.assertEqual(dict(request.headers)["OpenAI-Project"], self.h.binding.project_id)
         self.assertEqual(dict(request.headers)["OpenAI-Beta"], "agents=v1")
-        self.assertEqual(json.loads(request.body), {"events": [{"type": MESSAGE, "input": [{
-            "role": "user", "content": [{"type": "input_text", "text": CANARY_MESSAGE}],
-        }]}]})
+        self.assertEqual(
+            json.loads(request.body),
+            {
+                "events": [
+                    {
+                        "type": MESSAGE,
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [{"type": "input_text", "text": CANARY_MESSAGE}],
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
         self.blocked(self.h.restart().submit_canary, "already_attempted")
         self.blocked(self.h.restart().create_session, "already_attempted")
         self.assertEqual(len(self.h.transport.posts(MESSAGE)), 1)
@@ -130,7 +147,8 @@ class AgentsAPIContractTests(unittest.TestCase):
     def test_no_free_prompt_or_task_parameter_exists(self):
         for args in (
             {"prompt": SENSITIVE_MARKER},
-            {"task": "different task"}, {"message": "different message"}
+            {"task": "different task"},
+            {"message": "different message"},
         ):
             with self.assertRaises(TypeError):
                 self.h.adapter.submit_canary(**args)
@@ -142,15 +160,27 @@ class AgentsAPIContractTests(unittest.TestCase):
         def inspect(operation, request):
             state = self.h.state()
             if operation in {"create", "message", "cancel"}:
-                observed.append((operation, state.phase, state.session_id, state.idempotency_key,
-                                 state.message_digest, state.request_count))
+                observed.append(
+                    (
+                        operation,
+                        state.phase,
+                        state.session_id,
+                        state.idempotency_key,
+                        state.message_digest,
+                        state.request_count,
+                    )
+                )
 
         self.h.transport.before_response = inspect
         self.h.active().cancel()
-        self.assertEqual([v[:2] for v in observed], [
-            ("create", "SESSION_UNCERTAIN"), ("message", "MESSAGE_UNCERTAIN"),
-            ("cancel", "CANCEL_UNCERTAIN"),
-        ])
+        self.assertEqual(
+            [v[:2] for v in observed],
+            [
+                ("create", "SESSION_UNCERTAIN"),
+                ("message", "MESSAGE_UNCERTAIN"),
+                ("cancel", "CANCEL_UNCERTAIN"),
+            ],
+        )
         for operation, _, session, key, digest, count in observed:
             self.assertEqual(key, self.h.binding.idempotency_key)
             self.assertEqual(digest, sha256(CANARY_MESSAGE))
@@ -276,8 +306,11 @@ class AgentsAPIContractTests(unittest.TestCase):
         self.h.active()
         original = dict(self.h.transport.turn)
         for field, value in (
-            ("session_id", "session_foreign"), ("agent_id", "agent_foreign"),
-            ("id", "turn_foreign"), ("subagent_id", "subagent_foreign"), ("object", "wrong"),
+            ("session_id", "session_foreign"),
+            ("agent_id", "agent_foreign"),
+            ("id", "turn_foreign"),
+            ("subagent_id", "subagent_foreign"),
+            ("object", "wrong"),
         ):
             with self.subTest(field=field):
                 self.h.transport.turn = {**original, field: value}
@@ -297,9 +330,9 @@ class AgentsAPIContractTests(unittest.TestCase):
         self.h.adapter.create_session()
         self.h.adapter.submit_canary()
         for status in ("idle", "succeeded", {}, None, True):
-            self.h.transport.faults["turns"].append(response(page([
-                {**self.h.transport.turn, "status": status}
-            ])))
+            self.h.transport.faults["turns"].append(
+                response(page([{**self.h.transport.turn, "status": status}]))
+            )
             self.blocked(self.h.adapter.reconcile, "turn_binding")
 
     def test_terminal_conflict_regression_or_disappearance_blocks(self):
@@ -320,12 +353,18 @@ class AgentsAPIContractTests(unittest.TestCase):
         self.h.adapter.reconcile()
         rendered = json.dumps(self.h.adapter.report())
         for value in (
-            SENSITIVE_MARKER, SESSION, TURN, self.h.binding.idempotency_key, "Authorization"
+            SENSITIVE_MARKER,
+            SESSION,
+            TURN,
+            self.h.binding.idempotency_key,
+            "Authorization",
         ):
             self.assertNotIn(value, rendered)
         for key in (
-            "live_authorized", "github_write_authorized",
-            "repository_write_authorized", "merge_authorized"
+            "live_authorized",
+            "github_write_authorized",
+            "repository_write_authorized",
+            "merge_authorized",
         ):
             self.assertIs(self.h.adapter.report()[key], False)
 
@@ -342,8 +381,10 @@ class AgentsAPIGateTests(unittest.TestCase):
 
     def test_project_credential_agent_provider_and_intent_are_bound(self):
         for changes in (
-            {"project_id": "proj_other"}, {"credential_project_id": "proj_other"},
-            {"agent_id": "agent_other"}, {"provider_base": "https://example.com"},
+            {"project_id": "proj_other"},
+            {"credential_project_id": "proj_other"},
+            {"agent_id": "agent_other"},
+            {"provider_base": "https://example.com"},
             {"binding_digest": "b" * 64},
         ):
             with self.subTest(changes=changes):
@@ -352,8 +393,12 @@ class AgentsAPIGateTests(unittest.TestCase):
     def test_key_permissions_and_project_rights_must_both_be_minimal(self):
         for field in ("key_capabilities", "project_capabilities"):
             for scope in (
-                frozenset(), frozenset({"session:read"}), MINIMAL_CAPABILITIES | {"admin"},
-                MINIMAL_CAPABILITIES - {"cancel:request"}, set(MINIMAL_CAPABILITIES), True,
+                frozenset(),
+                frozenset({"session:read"}),
+                MINIMAL_CAPABILITIES | {"admin"},
+                MINIMAL_CAPABILITIES - {"cancel:request"},
+                set(MINIMAL_CAPABILITIES),
+                True,
             ):
                 with self.subTest(field=field, scope_type=type(scope).__name__):
                     self.assert_gate_blocks(**{field: scope})
@@ -372,18 +417,24 @@ class AgentsAPIGateTests(unittest.TestCase):
 
     def test_stale_future_overlong_or_noninteger_evidence_blocks(self):
         for changes in (
-            {"expires_at": NOW}, {"observed_at": NOW + 1},
-            {"observed_at": NOW - 3601}, {"expires_at": NOW + 3601},
-            {"observed_at": True}, {"expires_at": None},
+            {"expires_at": NOW},
+            {"observed_at": NOW + 1},
+            {"observed_at": NOW - 3601},
+            {"expires_at": NOW + 3601},
+            {"observed_at": True},
+            {"expires_at": None},
         ):
             with self.subTest(changes=changes):
                 self.assert_gate_blocks(**changes)
 
     def test_missing_wrong_expired_or_excessive_operator_grant_blocks(self):
         for changes in (
-            {"operator_grant_verified": False}, {"grant_binding_digest": "b" * 64},
-            {"grant_budget_cents": 4}, {"grant_budget_cents": True},
-            {"grant_expires_at": NOW}, {"grant_issued_at": NOW + 1},
+            {"operator_grant_verified": False},
+            {"grant_binding_digest": "b" * 64},
+            {"grant_budget_cents": 4},
+            {"grant_budget_cents": True},
+            {"grant_expires_at": NOW},
+            {"grant_issued_at": NOW + 1},
             {"grant_expires_at": NOW + 3601},
         ):
             with self.subTest(changes=changes):
@@ -469,7 +520,8 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
                     )
                     action = {
                         "create": h.adapter.create_session,
-                        "message": h.adapter.submit_canary, "cancel": h.adapter.cancel,
+                        "message": h.adapter.submit_canary,
+                        "cancel": h.adapter.cancel,
                     }[operation]
                     with self.assertRaises(AgentsAPIError) as caught:
                         action()
@@ -499,9 +551,11 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
         operations.append(gate_adapter.create_session)
         journal = Mock()
         journal.load.side_effect = RuntimeError(SENSITIVE_MARKER)
-        operations.append(AgentsAPIAdapter(
-            binding(), journal, transport=self.h.transport, gate=self.h.gate, now=lambda: NOW
-        ).create_session)
+        operations.append(
+            AgentsAPIAdapter(
+                binding(), journal, transport=self.h.transport, gate=self.h.gate, now=lambda: NOW
+            ).create_session
+        )
         output = io.StringIO()
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
             for operation in operations:
@@ -525,8 +579,17 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
             self.assertEqual(h.state().phase, "SESSION_UNCERTAIN")
 
     def test_invalid_utf8_json_duplicates_constants_and_nonobjects_are_sanitized(self):
-        for raw in (b"\xff", b"{", b"[]", b"true", b'{"id":1,"id":2}', b'{"x":NaN}',
-                    b'{"x":Infinity}', ('{"error":"' + SENSITIVE_MARKER).encode(), b"[" * 1100):
+        for raw in (
+            b"\xff",
+            b"{",
+            b"[]",
+            b"true",
+            b'{"id":1,"id":2}',
+            b'{"x":NaN}',
+            b'{"x":Infinity}',
+            ('{"error":"' + SENSITIVE_MARKER).encode(),
+            b"[" * 1100,
+        ):
             h = Harness()
             self.addCleanup(h.connection.close)
             h.transport.faults["create"].append(WireResponse(201, raw))
@@ -538,19 +601,28 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
         self.h.transport.faults["create"].append(TimeoutError())
         with self.assertRaises(AgentsAPIError):
             self.h.adapter.create_session()
-        for value in (page([{}] * 21), page([], has_more=True),
-                      {"object": "list", "data": {}, "has_more": False},
-                      {**page([]), **{f"extra_{i}": i for i in range(65)}}):
+        for value in (
+            page([{}] * 21),
+            page([], has_more=True),
+            {"object": "list", "data": {}, "has_more": False},
+            {**page([]), **{f"extra_{i}": i for i in range(65)}},
+        ):
             self.h.transport.faults["list"].append(response(value))
             with self.assertRaises(AgentsAPIError):
                 self.h.adapter.reconcile()
 
     def test_malformed_session_binding_safety_or_spend_controls_never_unlock_message(self):
         cases = (
-            {"id": SENSITIVE_MARKER}, {"id": "bad/id"}, {"metadata": {}},
+            {"id": SENSITIVE_MARKER},
+            {"id": "bad/id"},
+            {"metadata": {}},
             {"project_id": "proj_foreign"},
-            {"agent": None}, {"environment": None}, {"status": {}}, {"vault_ids": ["private"]},
-            {"spend_control": None}, {"spend_control": {"limit": 6, "consumed": 0}},
+            {"agent": None},
+            {"environment": None},
+            {"status": {}},
+            {"vault_ids": ["private"]},
+            {"spend_control": None},
+            {"spend_control": {"limit": 6, "consumed": 0}},
             {"spend_control": {"limit": True, "consumed": 0}},
             {"spend_control": {"limit": 5, "consumed": True}},
             {"spend_control": {"limit": 5, "consumed": -1}},
@@ -567,8 +639,11 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
 
     def test_enabled_tools_or_subagents_and_nonidle_creation_are_rejected(self):
         for changes in (
-            {"tools": [{"type": "shell"}]}, {"multi_agent": {"enabled": True}},
-            {"multi_agent": None}, {"instructions": "free task"}, {"id": "agent_other"},
+            {"tools": [{"type": "shell"}]},
+            {"multi_agent": {"enabled": True}},
+            {"multi_agent": None},
+            {"instructions": "free task"},
+            {"id": "agent_other"},
         ):
             h = Harness()
             self.addCleanup(h.connection.close)
@@ -576,7 +651,8 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
             with self.assertRaises(AgentsAPIError):
                 h.adapter.create_session()
         for changes in (
-            {"status": "in_progress"}, {"required_actions": [{"type": "function_call"}]}
+            {"status": "in_progress"},
+            {"required_actions": [{"type": "function_call"}]},
         ):
             h = Harness()
             self.addCleanup(h.connection.close)
@@ -585,8 +661,14 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
                 h.adapter.create_session()
 
     def test_wrong_provider_ack_status_or_response_types_fail_closed(self):
-        for fault in (WireResponse(200), WireResponse(True), WireResponse(302),
-                      WireResponse(201, SENSITIVE_MARKER), {"status": 201}, None):
+        for fault in (
+            WireResponse(200),
+            WireResponse(True),
+            WireResponse(302),
+            WireResponse(201, SENSITIVE_MARKER),
+            {"status": 201},
+            None,
+        ):
             h = Harness()
             self.addCleanup(h.connection.close)
             h.transport.faults["create"].append(fault)
@@ -638,22 +720,37 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
         self.assertEqual(len(h.transport.calls), 7)
 
     def test_invalid_limits_and_bindings_are_rejected_before_any_io(self):
-        for changes in ({"timeout_seconds": 0}, {"timeout_seconds": 31}, {"timeout_seconds": True},
-                        {"response_bytes": 65537}, {"event_bytes": 8193}, {"max_records": 21},
-                        {"max_requests": 33}, {"response_bytes": 1024, "event_bytes": 8192}):
+        for changes in (
+            {"timeout_seconds": 0},
+            {"timeout_seconds": 31},
+            {"timeout_seconds": True},
+            {"response_bytes": 65537},
+            {"event_bytes": 8193},
+            {"max_records": 21},
+            {"max_requests": 33},
+            {"response_bytes": 1024, "event_bytes": 8192},
+        ):
             with self.assertRaises(AgentsAPIError):
                 self.h.restart(limits=AgentsAPILimits(**changes))
-        for changes in ({"provider_base": "https://example.com"}, {"project_id": SENSITIVE_MARKER},
-                        {"agent_id": "bad/id"}, {"idempotency_key": "x" * 97},
-                        {"budget_cents": True}, {"budget_cents": 101}, {"plan_digest": "wrong"}):
+        for changes in (
+            {"provider_base": "https://example.com"},
+            {"project_id": SENSITIVE_MARKER},
+            {"agent_id": "bad/id"},
+            {"idempotency_key": "x" * 97},
+            {"budget_cents": True},
+            {"budget_cents": 101},
+            {"plan_digest": "wrong"},
+        ):
             with self.assertRaises(AgentsAPIError):
                 AgentsAPIAdapter(binding(**changes), self.h.journal)
         self.assertEqual(self.h.transport.calls, [])
 
     def test_only_injected_fixture_is_used_no_network_process_files_or_environment(self):
         with (
-            patch("socket.socket") as network, patch("subprocess.Popen") as process,
-            patch("builtins.open") as files, patch("os.getenv") as env,
+            patch("socket.socket") as network,
+            patch("subprocess.Popen") as process,
+            patch("builtins.open") as files,
+            patch("os.getenv") as env,
             patch("developer_team.adapters.github.GitHubPRWriter.open") as github_write,
         ):
             self.h.active().cancel()
@@ -661,7 +758,10 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
             self.h.adapter.reconcile()
         for mock in (network, process, files, env, github_write):
             mock.assert_not_called()
-        self.assertTrue(all(
-            r.url.startswith(PROVIDER_BASE + "/v1/agents/sessions") for r in self.h.transport.calls
-        ))
+        self.assertTrue(
+            all(
+                r.url.startswith(PROVIDER_BASE + "/v1/agents/sessions")
+                for r in self.h.transport.calls
+            )
+        )
         self.assertTrue(all(r.method in {"GET", "POST"} for r in self.h.transport.calls))

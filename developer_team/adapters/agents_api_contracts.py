@@ -69,9 +69,10 @@ class CanaryBinding:
     def validate(self) -> None:
         if type(self.provider_base) is not str or self.provider_base != PROVIDER_BASE:
             raise AgentsAPIError("provider_base_mismatch")
-        if not all(safe_ref(v) for v in (
-            self.project_id, self.agent_id, self.intent_id, self.idempotency_key
-        )):
+        if not all(
+            safe_ref(v)
+            for v in (self.project_id, self.agent_id, self.intent_id, self.idempotency_key)
+        ):
             raise AgentsAPIError("invalid_binding_reference")
         if type(self.plan_digest) is not str or _SHA256.fullmatch(self.plan_digest) is None:
             raise AgentsAPIError("invalid_plan_digest")
@@ -140,12 +141,16 @@ class ExternalPermit:
 
     def validate(self, binding: CanaryBinding, operation: str, now: int) -> None:
         if (
-            type(self.provider_base) is not str or self.provider_base != PROVIDER_BASE
-            or type(self.binding_digest) is not str or self.binding_digest != binding.digest
-            or type(self.project_id) is not str or self.project_id != binding.project_id
+            type(self.provider_base) is not str
+            or self.provider_base != PROVIDER_BASE
+            or type(self.binding_digest) is not str
+            or self.binding_digest != binding.digest
+            or type(self.project_id) is not str
+            or self.project_id != binding.project_id
             or type(self.credential_project_id) is not str
             or self.credential_project_id != binding.project_id
-            or type(self.agent_id) is not str or self.agent_id != binding.agent_id
+            or type(self.agent_id) is not str
+            or self.agent_id != binding.agent_id
         ):
             raise AgentsAPIError("external_project_or_binding_mismatch")
         for capabilities in (self.key_capabilities, self.project_capabilities):
@@ -157,7 +162,8 @@ class ExternalPermit:
             ):
                 raise AgentsAPIError("minimal_effective_scope_required")
         if (
-            type(self.source) is not str or self.source != "controlled-account-readonly-verifier"
+            type(self.source) is not str
+            or self.source != "controlled-account-readonly-verifier"
             or self.secret_store_verified is not True
             or self.contract_verified is not True
             or self.agent_configuration_verified is not True
@@ -172,9 +178,8 @@ class ExternalPermit:
         # Read/stop operations remain available after start-grant expiry or budget exhaustion.
         if operation not in {"create_session", "submit_canary"}:
             return
-        if (
-            self.spend_controls_verified is not True
-            or not bounded_int(self.project_hard_limit_cents, binding.budget_cents, 100)
+        if self.spend_controls_verified is not True or not bounded_int(
+            self.project_hard_limit_cents, binding.budget_cents, 100
         ):
             raise AgentsAPIError("external_spend_controls_required")
         if (
@@ -242,23 +247,33 @@ class CanaryState:
 
     def validate(self, binding: CanaryBinding) -> None:
         if (
-            type(self.binding_digest) is not str or self.binding_digest != binding.digest
+            type(self.binding_digest) is not str
+            or self.binding_digest != binding.digest
             or type(self.idempotency_key) is not str
             or self.idempotency_key != binding.idempotency_key
             or type(self.message_digest) is not str
             or self.message_digest != sha256(CANARY_MESSAGE)
-            or type(self.limits_digest) is not str or _SHA256.fullmatch(self.limits_digest) is None
+            or type(self.limits_digest) is not str
+            or _SHA256.fullmatch(self.limits_digest) is None
         ):
             raise AgentsAPIError("journal_binding_mismatch")
         phases = {
-            "PREPARED", "SESSION_UNCERTAIN", "SESSION_READY", "MESSAGE_UNCERTAIN",
-            "MESSAGE_ACCEPTED", "TURN_BOUND", "CANCEL_UNCERTAIN", "CANCEL_REQUESTED", "TERMINAL",
+            "PREPARED",
+            "SESSION_UNCERTAIN",
+            "SESSION_READY",
+            "MESSAGE_UNCERTAIN",
+            "MESSAGE_ACCEPTED",
+            "TURN_BOUND",
+            "CANCEL_UNCERTAIN",
+            "CANCEL_REQUESTED",
+            "TERMINAL",
         }
         if type(self.phase) is not str or self.phase not in phases:
             raise AgentsAPIError("invalid_journal_state")
-        if not all(bounded_int(v, 0, 1) for v in (
-            self.session_attempts, self.message_attempts, self.cancel_attempts
-        )) or not bounded_int(self.request_count, 0, 32):
+        if not all(
+            bounded_int(v, 0, 1)
+            for v in (self.session_attempts, self.message_attempts, self.cancel_attempts)
+        ) or not bounded_int(self.request_count, 0, 32):
             raise AgentsAPIError("invalid_journal_counters")
         for value in (self.session_id, self.turn_id):
             if value is not None and not safe_ref(value):
@@ -273,9 +288,10 @@ class CanaryState:
             or (
                 self.phase in {"CANCEL_UNCERTAIN", "CANCEL_REQUESTED"} and self.cancel_attempts != 1
             )
-            or (self.cancel_attempts == 1 and self.phase not in {
-                "CANCEL_UNCERTAIN", "CANCEL_REQUESTED", "TERMINAL"
-            })
+            or (
+                self.cancel_attempts == 1
+                and self.phase not in {"CANCEL_UNCERTAIN", "CANCEL_REQUESTED", "TERMINAL"}
+            )
             or (self.phase == "TERMINAL") != (self.terminal_kind is not None)
         ):
             raise AgentsAPIError("inconsistent_journal_state")
