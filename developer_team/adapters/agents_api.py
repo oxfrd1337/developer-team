@@ -196,8 +196,10 @@ class AgentsAPIAdapter:
             # Final check AFTER durable writes: journal delays must not extend an approval.
             # Cancel has its own fresh approval, independent of expired start grants.
             # Every POST re-enters the external gate.
-            operation = "submit_canary" if message_key else (
-                "create_session" if path == SESSIONS_PATH else "cancel"
+            operation = (
+                "submit_canary"
+                if message_key
+                else ("create_session" if path == SESSIONS_PATH else "cancel")
             )
             self._authorize(operation)
         started = self._monotonic()
@@ -293,11 +295,8 @@ class AgentsAPIAdapter:
             raise AgentsAPIError("provider_session_binding_mismatch")
         expected_agent = self._binding.agent_configuration
         expected_agent["multi_agent"]["max_concurrent_subagents"] = None
-        if (
-            set(agent) - {"id", "name"} != set(expected_agent)
-            or not _matches_configuration(
-                {key: agent[key] for key in expected_agent}, expected_agent
-            )
+        if set(agent) - {"id", "name"} != set(expected_agent) or not _matches_configuration(
+            {key: agent[key] for key in expected_agent}, expected_agent
         ):
             raise AgentsAPIError("provider_effective_agent_mismatch")
         expected_environment = self._binding.environment_configuration
@@ -305,10 +304,7 @@ class AgentsAPIAdapter:
         if (
             type(environment) is not dict
             or not safe_ref(environment.get("id"))
-            or (
-                state.environment_id is not None
-                and environment["id"] != state.environment_id
-            )
+            or (state.environment_id is not None and environment["id"] != state.environment_id)
             or set(environment) - {"id"} != set(expected_environment)
             or not _matches_configuration(
                 {key: environment[key] for key in expected_environment}, expected_environment
@@ -329,9 +325,7 @@ class AgentsAPIAdapter:
             or not 0 <= consumed <= 1_000_000_000
         ):
             raise AgentsAPIError("invalid_provider_spend_observation")
-        return (
-            identifier, environment["id"], str(consumed), consumed > self._binding.budget_cents
-        )
+        return (identifier, environment["id"], str(consumed), consumed > self._binding.budget_cents)
 
     def _read_session(self, revision: int, state: CanaryState) -> tuple[int, CanaryState, dict]:
         revision, state, response = self._request(

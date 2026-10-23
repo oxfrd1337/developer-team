@@ -159,9 +159,10 @@ class SavedAgentReviewTests(ReviewHarnessTests):
         h = self.harness()
         h.adapter.create_session()
         agent = json.loads(h.transport.posts("create")[0].body)["agent"]
-        self.assertEqual(set(agent), {
-            "model", "instructions", "tools", "multi_agent", "reasoning", "service_tier", "text"
-        })
+        self.assertEqual(
+            set(agent),
+            {"model", "instructions", "tools", "multi_agent", "reasoning", "service_tier", "text"},
+        )
         self.assertEqual(agent["model"], "synthetic-canary-model-v1")
         self.assertEqual(agent["reasoning"], {"effort": "low", "summary": None})
         self.assertEqual(agent["service_tier"], "default")
@@ -172,9 +173,12 @@ class SavedAgentReviewTests(ReviewHarnessTests):
     def test_changed_saved_agent_after_verification_is_overridden_before_creation(self):
         h = self.harness()
         saved = {
-            "model": "synthetic-expensive-model", "reasoning": {"effort": "max", "summary": "auto"},
-            "service_tier": "priority", "text": {"format": {"type": "text"}, "verbosity": "high"},
-            "tools": [{"type": "web_search"}], "multi_agent": {"enabled": True},
+            "model": "synthetic-expensive-model",
+            "reasoning": {"effort": "max", "summary": "auto"},
+            "service_tier": "priority",
+            "text": {"format": {"type": "text"}, "verbosity": "high"},
+            "tools": [{"type": "web_search"}],
+            "multi_agent": {"enabled": True},
             "instructions": "changed after account verification",
         }
         original_exchange = h.transport.exchange
@@ -183,7 +187,9 @@ class SavedAgentReviewTests(ReviewHarnessTests):
             if request.method == "POST" and request.url.endswith("/sessions"):
                 overrides = json.loads(request.body)["agent"]
                 h.transport.session["agent"] = {
-                    **saved, **overrides, "id": h.binding.agent_id,
+                    **saved,
+                    **overrides,
+                    "id": h.binding.agent_id,
                     "multi_agent": {"enabled": False, "max_concurrent_subagents": None},
                 }
             return original_exchange(request)
@@ -198,7 +204,8 @@ class SavedAgentReviewTests(ReviewHarnessTests):
             ("model", "synthetic-expensive-model"),
             ("reasoning", {"effort": "max", "summary": None}),
             ("reasoning", {"effort": "low", "summary": "detailed"}),
-            ("service_tier", "priority"), ("service_tier", "auto"),
+            ("service_tier", "priority"),
+            ("service_tier", "auto"),
             ("text", {"format": {"type": "text"}, "verbosity": "high"}),
         ):
             with self.subTest(field=field, value=value):
@@ -215,9 +222,11 @@ class SavedAgentReviewTests(ReviewHarnessTests):
             del h.transport.session["agent"][field]
             self.assert_create_blocks(h, "effective_agent_mismatch")
         for field, value in (
-            ("reasoning", None), ("reasoning", {"effort": "low"}),
+            ("reasoning", None),
+            ("reasoning", {"effort": "low"}),
             ("reasoning", {"effort": None, "summary": None}),
-            ("service_tier", None), ("text", {"format": {"type": "text"}}),
+            ("service_tier", None),
+            ("text", {"format": {"type": "text"}}),
             ("multi_agent", {"enabled": False}),
             ("multi_agent", {"enabled": 0, "max_concurrent_subagents": None}),
         ):
@@ -237,7 +246,8 @@ class SavedAgentReviewTests(ReviewHarnessTests):
 
     def test_agent_drift_after_creation_blocks_first_message(self):
         for field, value in (
-            ("model", "synthetic-other-model"), ("service_tier", "fast"),
+            ("model", "synthetic-other-model"),
+            ("service_tier", "fast"),
             ("reasoning", {"effort": "high", "summary": None}),
         ):
             h = self.harness()
@@ -257,8 +267,11 @@ class SavedAgentReviewTests(ReviewHarnessTests):
         with self.assertRaisesRegex(AgentsAPIError, "binding_mismatch"):
             h.journal.load(changed)
         adapter = AgentsAPIAdapter(
-            changed, h.journal, transport=h.transport,
-            gate=FixtureGate(permit(changed)), now=lambda: NOW
+            changed,
+            h.journal,
+            transport=h.transport,
+            gate=FixtureGate(permit(changed)),
+            now=lambda: NOW,
         )
         with self.assertRaisesRegex(AgentsAPIError, "journal"):
             adapter.create_session()
@@ -280,9 +293,9 @@ class SavedAgentReviewTests(ReviewHarnessTests):
         h = self.harness()
         previous = asdict(h.binding)
         del previous["model"]
-        previous_digest = sha256({
-            **previous, "message": CANARY_MESSAGE, "instructions": CANARY_INSTRUCTIONS
-        })
+        previous_digest = sha256(
+            {**previous, "message": CANARY_MESSAGE, "instructions": CANARY_INSTRUCTIONS}
+        )
         self.assertNotEqual(previous_digest, h.binding.digest)
         h.gate.value = permit(binding_digest=previous_digest, grant_binding_digest=previous_digest)
         with self.assertRaisesRegex(AgentsAPIError, "binding_mismatch"):
@@ -324,8 +337,13 @@ class FreshCreationApprovalReviewTests(ReviewHarnessTests):
                 self.assert_approval_blocks(create_approved_at=approval)
 
     def test_missing_or_wrong_create_approval_binding_blocks(self):
-        for digest in (None, "b" * 64, True, binding(intent_id="intent_other").digest,
-                       binding(model="synthetic-other-model").digest):
+        for digest in (
+            None,
+            "b" * 64,
+            True,
+            binding(intent_id="intent_other").digest,
+            binding(model="synthetic-other-model").digest,
+        ):
             self.assert_approval_blocks(create_approval_binding_digest=digest)
 
     def test_fresh_create_approval_does_not_replace_separate_submit_approval(self):
@@ -424,9 +442,10 @@ class FreshCreationApprovalReviewTests(ReviewHarnessTests):
 
         h.transport.before_response = inspect
         h.active().cancel()
-        self.assertEqual(observed, [
-            ("create", "create_session"), ("message", "submit_canary"), ("cancel", "cancel")
-        ])
+        self.assertEqual(
+            observed,
+            [("create", "create_session"), ("message", "submit_canary"), ("cancel", "cancel")],
+        )
 
     def test_missing_old_future_or_wrong_type_cancel_approval_blocks_before_any_call(self):
         for approval in (None, NOW - 61, NOW + 1, True, "now"):
