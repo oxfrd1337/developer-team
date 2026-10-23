@@ -1,5 +1,20 @@
 # Teststrategie
 
+## DT-017B
+
+`tests/test_provider_readonly_runner.py` ergänzt die DT-017A-Negativmatrix um den
+lokalen Operator-Halt, unveränderliche Rollen-FD-Pins, vertauschte/geschlossene/
+ersetzte/fremde/schreibbare Deskriptoren, CI-/env-Sperren, Secret-Argumente und
+Manifestfehler. Erfolgreiche synthetische GETs belegen keine weiteren Gates;
+Scope-Self-Attestation bleibt gesperrt. DNS/TLS/Timeout/Redirect/401/403/429/5xx,
+Rohantworten und Fehlertexte werden ausschließlich synthetisch geprüft.
+Jeder Runner-Test blockiert zusätzlich echte Sockets. Die vollständige bestehende
+Python-3.11–3.13-Matrix mit Ruff/Format/Coverage/Build/Smoke/Checkpoint bleibt bestehen.
+Die CI setzt `DT_PROVIDER_OFFLINE=1`; kein echter OpenAI-Aufruf.
+[Bedienung, Voraussetzungen und Live-Blocker](dt-017b-readonly-runner.md).
+Namespace-/Bubblewrap-Skip bleibt fehlende Isolationsevidence.
+**OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
+
 ## DT-016
 
 ```sh

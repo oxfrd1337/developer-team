@@ -1,5 +1,12 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
+## DT-017B: lokaler Evidence-Runner
+
+[One-shot-Runner mit externen Rollen-FDs](docs/dt-017b-readonly-runner.md):
+standardmäßig ohne Netzwerk, reale GETs nur mit lokalem `--execute-real-readonly`.
+CI bleibt synthetisch. **real_submissions = 0 · LIVE = NO-GO.**
+**OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
+
 ## DT-017A: ausschließlich lesende Provider-Collector
 
 [Getrennte Admin-/Canary-GETs und Scope-Attestation](docs/dt-017a-readonly-provider.md)

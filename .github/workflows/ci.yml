@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  DT_PROVIDER_OFFLINE: '1'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
