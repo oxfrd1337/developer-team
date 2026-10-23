@@ -268,3 +268,24 @@ class HTTPSTests(unittest.TestCase):
         for descriptor in (-1, None, True):
             with self.assertRaises(AgentsAPIError):
                 FDSecretStore(descriptor, self.bound.project_id)
+
+    def test_header_limit_applies_to_status_line_and_cumulative_headers(self):
+        from developer_team.adapters.agents_https import BoundedHTTPResponse
+
+        for header in (b"X-Large: " + b"x" * 8192, b"X-A: y\r\n" * 100):
+            sock = Mock()
+            sock.makefile.return_value = io.BytesIO(b"HTTP/1.1 200 OK\r\n" + header + b"\r\n\r\n")
+            response = BoundedHTTPResponse(sock, header_limit=256)
+            with self.assertRaises(AgentsAPIError):
+                response.begin()
+            response.close()
+        sock = Mock()
+        sock.makefile.return_value = io.BytesIO(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}")
+        response = BoundedHTTPResponse(sock, header_limit=256)
+        response.begin()
+        self.assertEqual(response.read(), b"{}")
+        response.close()
+
+    def test_no_implicit_reconnect_after_connection_is_closed(self):
+        self.transport.exchange(self.request())
+        self.assertEqual(self.conn.auto_open, 0)

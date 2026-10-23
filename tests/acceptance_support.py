@@ -61,6 +61,8 @@ class Collector:
                 "max_messages": 1,
                 "exclusive_external_ownership": True,
                 "grant_ref": "grant_synthetic",
+                "issued_at": NOW,
+                "expires_at": NOW + 300,
             },
         }
         self.observations = {

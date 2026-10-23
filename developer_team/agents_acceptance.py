@@ -10,7 +10,7 @@ from __future__ import annotations
 import secrets
 import sqlite3
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from .adapters.agents_api import AgentsAPIAdapter
 from .adapters.agents_api_contracts import (
@@ -52,7 +52,7 @@ class Observation:
     facts: dict
 
 
-def _facts_match(check, facts, b):
+def _facts_match(check, facts, b, now):
     """Strict normalized schemas; never copy input values into diagnostics."""
     if type(facts) is not dict:
         return False
@@ -108,6 +108,11 @@ def _facts_match(check, facts, b):
         if not safe_ref(facts.get("grant_ref")):
             return False
         expected["grant_ref"] = facts["grant_ref"]
+        if not bounded_int(facts.get("issued_at"), max(0, now - 3600), now):
+            return False
+        if not bounded_int(facts.get("expires_at"), now + 1, facts["issued_at"] + 3600):
+            return False
+        expected["issued_at"], expected["expires_at"] = facts["issued_at"], facts["expires_at"]
     # canonical digest comparison includes JSON types (False is not 0).
     return sha256(facts) == sha256(expected)
 
@@ -144,7 +149,7 @@ class ReadOnlyVerifier:
                     and bounded_int(now, 0, 2**53)
                     and bounded_int(observation.observed_at, max(0, now - 300), now)
                     and bounded_int(observation.expires_at, now + 1, observation.observed_at + 300)
-                    and _facts_match(check, observation.facts, binding)
+                    and _facts_match(check, observation.facts, binding, now)
                 )
             except Exception:
                 valid = False
@@ -243,7 +248,9 @@ class AcceptanceController:
     def _durable(self):
         try:
             self._slot()
-            self._journal.load(self._binding)
+            _, state = self._journal.load(self._binding)
+            if state.limits_digest != sha256(asdict(self._limits)):
+                return False
             databases = self._connection.execute("PRAGMA database_list").fetchall()
             return (
                 any(row[1] == "main" and row[2] for row in databases)
@@ -382,8 +389,8 @@ class AcceptanceController:
             expires_at=expiry,
             grant_binding_digest=b.digest,
             grant_budget_cents=b.budget_cents,
-            grant_issued_at=grant.observed_at if grant else 0,
-            grant_expires_at=grant.expires_at if grant else 0,
+            grant_issued_at=grant.facts["issued_at"] if grant else 0,
+            grant_expires_at=grant.facts["expires_at"] if grant else 0,
             secret_store_verified=True,
             spend_controls_verified=checks["spend_controls"] == "PASS",
             contract_verified=True,

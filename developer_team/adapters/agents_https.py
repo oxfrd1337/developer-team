@@ -29,6 +29,37 @@ from .agents_api_contracts import (
 )
 
 
+class _HeaderReader:
+    def __init__(self, stream, limit):
+        self._stream, self._remaining = stream, limit
+
+    def readline(self, limit):
+        data = self._stream.readline(min(limit, self._remaining + 1))
+        self._remaining -= len(data)
+        if self._remaining < 0:
+            raise AgentsAPIError("http_response_headers_too_large")
+        return data
+
+    def close(self):
+        self._stream.close()
+
+
+class BoundedHTTPResponse(http.client.HTTPResponse):
+    """Bound status line and complete response headers before parsing any body."""
+
+    def __init__(self, *args, header_limit=8192, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._header_limit = header_limit
+
+    def begin(self):
+        stream = self.fp
+        self.fp = _HeaderReader(stream, self._header_limit)
+        try:
+            super().begin()
+        finally:
+            self.fp = stream
+
+
 class FDSecretStore:
     """External store supplies an already opened private, regular-file descriptor.
 
@@ -225,7 +256,7 @@ class HardenedHTTPS:
                         conn.sock.shutdown(socket.SHUT_RDWR)
                     conn.close()
                 except Exception:
-                    continue
+                    stopped.set()
 
         def worker():
             response = None
@@ -233,6 +264,9 @@ class HardenedHTTPS:
             try:
                 conn = self._factory(min(self._connect_timeout, remaining))
                 connections.append(conn)
+                conn.response_class = lambda *args, **kwargs: BoundedHTTPResponse(
+                    *args, header_limit=min(8192, request.max_response_bytes), **kwargs
+                )
                 conn.auto_open = 0  # Never reconnect implicitly after a deadline closes the socket.
                 conn.connect()  # DNS/TLS may block; outer wait still has an absolute deadline.
                 if stopped.is_set() or self._clock() >= request.deadline:

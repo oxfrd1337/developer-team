@@ -376,3 +376,20 @@ class AcceptanceTests(unittest.TestCase):
                 break
         self.assertLessEqual(self.h.state().request_count, self.h.controller._limits.max_requests)
         self.assertEqual(self.h.count_posts(), 2)
+
+    def test_fresh_observation_cannot_extend_expired_or_future_external_grant(self):
+        for changes in ({"expires_at": NOW}, {"issued_at": NOW + 1}, {"issued_at": NOW - 3601}):
+            self.h.collector = Collector()
+            self.h.collector.drift("single_canary_grant", **changes)
+            self.h.controller = self.h.restart()
+            with self.assertRaises(AgentsAPIError):
+                self.h.create()
+        self.assertEqual(self.h.connections, [])
+
+    def test_changed_limits_do_not_pass_durable_journal_gate(self):
+        from developer_team.adapters.agents_api_contracts import AgentsAPILimits
+
+        self.h.controller._limits = AgentsAPILimits(max_requests=20)
+        self.assertEqual(self.h.controller.report()["checks"]["durable_journal"], "MISSING")
+        with self.assertRaises(AgentsAPIError):
+            self.h.create()
