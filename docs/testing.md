@@ -207,3 +207,25 @@ Der produktive Gateway akzeptiert keinen Runner und verweigert bedingungslos;
 Lifecycle-Fixtures sind davon getrennt. Die feste Rehearsalantwort bleibt selbst bei
 gesetzten Runnerattributen modellfrei. Bestehende Vertragstests wurden auf die
 separate Test-Fixture umgestellt, ihre Prüfbedingungen nicht abgeschwächt.
+
+
+## DT-017
+
+`tests/test_agents_acceptance.py` und `tests/test_agents_https.py` prüfen den
+kontrollierten Controller, alle Pre-Live-Gates, getrennte frische Operator-Challenges,
+Drift, Unknown-Recovery, begrenztes Cleanup und den echten HTTPS-Code ausschließlich
+mit injizierten Wire-Verbindungen. Account, Secretmaterial und Providerantworten sind
+synthetisch. DNS/TLS/Connection/Timeout/401/403/429/5xx/Redirect und Größenlimits werden
+ohne echte Credentials oder Provider-POST geprüft. [Vertrag und Live-Blocker](dt-017-controlled-acceptance.md).
+
+**real_submissions = 0 · LIVE = NO-GO.**
+**OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
+
+
+Die PR-35-Reviewregressionen in `tests/test_agents_acceptance_review.py` prüfen die
+unveränderliche Credential-/Principal-/Handlebindung, fehlende/zusätzliche/veraltete
+Identitäten, tatsächlichen FD-Austausch, Identitätsablauf während der Probe sowie die
+unabhängige frische Read-only-Transport-Attestation einschließlich Origin, Projekt,
+Credentialidentität, TLS-Regeln, Route und Widerruf direkt am Wire. Alle Attestierungen
+und Transportproben sind synthetisch; kein echter OpenAI-Aufruf. Ein verfügbarer
+Transport ohne diese Evidence meldet `real_transport=MISSING_OR_INVALID` und NO-GO.

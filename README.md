@@ -1,5 +1,14 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
+## DT-017: kontrollierte Pre-Live-Abnahme
+
+[Transport, Accountprüfung und Operator-Halt](docs/dt-017-controlled-acceptance.md):
+getrennte frische Create-/Submit-Zustimmungen, feste HTTPS-Wire-Grenze und dauerhaft
+begrenzte Cleanup-Anforderung. Kein Standardbroker, keine CLI-Aktivierung.
+**real_submissions = 0 · LIVE = NO-GO.**
+**OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
+
+
 ## DT-016 V0.1: streng begrenzter Agents-API-Provideradapter
 
 [Adaptervertrag, Negativmatrix und Live-Blocker](docs/dt-016-agents-api-provider.md):
