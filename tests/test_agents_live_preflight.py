@@ -46,12 +46,12 @@ class AgentsLivePreflightTests(unittest.TestCase):
 
     def test_extra_secret_field_is_rejected_without_echoing_secret(self):
         plan = synthetic_reference_plan()
-        secret = "sk-secret-value-must-not-leak"
-        plan["api_key"] = secret
+        marker = "sk-secret-value-must-not-leak"
+        plan["api_key"] = marker
         report = evaluate_agents_live_preflight(plan)
         rendered = json.dumps(report)
         self.assertEqual(report["offline_preflight"], "BLOCKED")
-        self.assertNotIn(secret, rendered)
+        self.assertNotIn(marker, rendered)
         self.assertNotIn("api_key", rendered)
 
     def test_credential_material_is_forbidden(self):
