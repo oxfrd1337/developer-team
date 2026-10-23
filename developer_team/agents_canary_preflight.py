@@ -1,7 +1,5 @@
 """Fail-closed offline preflight for a later, separately approved Agents API canary."""
 
-from __future__ import annotations
-
 import hashlib
 import json
 import platform
