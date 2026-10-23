@@ -125,9 +125,7 @@ class AgentsLivePreflightTests(unittest.TestCase):
                 plan = synthetic_reference_plan()
                 plan[field] = "verified"
                 report = evaluate_agents_live_preflight(plan)
-                self.assertEqual(
-                    report["reasons"], ["external_verification_must_remain_pending"]
-                )
+                self.assertEqual(report["reasons"], ["external_verification_must_remain_pending"])
 
     def test_wrong_residency_or_zdr_assumption_blocks(self):
         plan = synthetic_reference_plan()
