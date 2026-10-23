@@ -42,18 +42,30 @@ class EffectivePermission(Enum):
     FILES_WRITE = auto()
 
 
-EXPECTED_KEY_PERMISSIONS = frozenset({
-    KeyPermission.AGENTS_READ, KeyPermission.AGENTS_WRITE,
-    KeyPermission.RESPONSES_WRITE, KeyPermission.MODEL_READ,
-})
-EXPECTED_PRINCIPAL_PERMISSIONS = frozenset({
-    PrincipalPermission.AGENTS_READ, PrincipalPermission.AGENTS_WRITE,
-    PrincipalPermission.RESPONSES_WRITE, PrincipalPermission.MODEL_READ,
-})
-EXPECTED_EFFECTIVE_PERMISSIONS = frozenset({
-    EffectivePermission.AGENTS_READ, EffectivePermission.AGENTS_WRITE,
-    EffectivePermission.RESPONSES_WRITE, EffectivePermission.MODEL_READ,
-})
+EXPECTED_KEY_PERMISSIONS = frozenset(
+    {
+        KeyPermission.AGENTS_READ,
+        KeyPermission.AGENTS_WRITE,
+        KeyPermission.RESPONSES_WRITE,
+        KeyPermission.MODEL_READ,
+    }
+)
+EXPECTED_PRINCIPAL_PERMISSIONS = frozenset(
+    {
+        PrincipalPermission.AGENTS_READ,
+        PrincipalPermission.AGENTS_WRITE,
+        PrincipalPermission.RESPONSES_WRITE,
+        PrincipalPermission.MODEL_READ,
+    }
+)
+EXPECTED_EFFECTIVE_PERMISSIONS = frozenset(
+    {
+        EffectivePermission.AGENTS_READ,
+        EffectivePermission.AGENTS_WRITE,
+        EffectivePermission.RESPONSES_WRITE,
+        EffectivePermission.MODEL_READ,
+    }
+)
 
 # Explicit independent mappings; no string equality or namespace rewriting.
 _PERMISSION_RULES = (
@@ -63,8 +75,11 @@ _PERMISSION_RULES = (
         PrincipalPermission.AGENTS_WRITE,
         EffectivePermission.AGENTS_WRITE,
     ),
-    (KeyPermission.RESPONSES_WRITE, PrincipalPermission.RESPONSES_WRITE,
-     EffectivePermission.RESPONSES_WRITE),
+    (
+        KeyPermission.RESPONSES_WRITE,
+        PrincipalPermission.RESPONSES_WRITE,
+        EffectivePermission.RESPONSES_WRITE,
+    ),
     (KeyPermission.MODEL_READ, PrincipalPermission.MODEL_READ, EffectivePermission.MODEL_READ),
 )
 

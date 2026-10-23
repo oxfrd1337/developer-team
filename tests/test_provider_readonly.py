@@ -310,7 +310,7 @@ class CollectorTests(unittest.TestCase):
             self.assert_blocked("credential_scope")
         self.h.collector._scope_verifier = Mock(
             identity=self.h.scope_verifier.identity,
-            verify=Mock(side_effect=ValueError(SYNTHETIC_SECRET))
+            verify=Mock(side_effect=ValueError(SYNTHETIC_SECRET)),
         )
         self.assertNotIn(SYNTHETIC_SECRET, json.dumps(self.h.collector.report()))
         self.assert_blocked("credential_scope")

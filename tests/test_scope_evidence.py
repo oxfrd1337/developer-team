@@ -151,8 +151,9 @@ class ScopeSubjectTests(unittest.TestCase):
         source.verify.assert_not_called()
 
     def test_distinct_wrapper_objects_with_same_subject_no_go(self):
-        forged = replace(self.h.scope_verifier.identity,
-                         subject_ref=self.h.scope_source.identity.subject_ref)
+        forged = replace(
+            self.h.scope_verifier.identity, subject_ref=self.h.scope_source.identity.subject_ref
+        )
         self.h.collector._scope_verifier = Mock(identity=forged, verify=Mock(return_value=True))
         self.h.collector._verifier_pin = forged
         self.assertIsNone(self.scope())
@@ -161,8 +162,10 @@ class ScopeSubjectTests(unittest.TestCase):
     def test_shared_trust_domain_or_public_key_is_not_independent(self):
         for field in ("trust_domain_ref", "public_key_digest"):
             self.h = Harness()
-            forged = replace(self.h.scope_verifier.identity,
-                             **{field: getattr(self.h.scope_source.identity, field)})
+            forged = replace(
+                self.h.scope_verifier.identity,
+                **{field: getattr(self.h.scope_source.identity, field)},
+            )
             self.h.collector._scope_verifier = Mock(identity=forged, verify=Mock(return_value=True))
             self.h.collector._verifier_pin = forged
             self.assertIsNone(self.scope())
@@ -175,14 +178,16 @@ class ScopeSubjectTests(unittest.TestCase):
 
     def test_swapped_source_and_verifier_adapters_fail_before_callbacks(self):
         self.h.collector._scope_source, self.h.collector._scope_verifier = (
-            self.h.scope_verifier, self.h.scope_source
+            self.h.scope_verifier,
+            self.h.scope_source,
         )
         self.assertIsNone(self.scope())
         self.assertEqual(self.h.scope_verifier.calls, 0)
 
     def test_swapped_role_identity_pins_are_invalid(self):
         self.h.collector._attestor_pin, self.h.collector._verifier_pin = (
-            self.h.collector._verifier_pin, self.h.collector._attestor_pin
+            self.h.collector._verifier_pin,
+            self.h.collector._attestor_pin,
         )
         self.assertIsNone(self.scope())
         self.assertEqual(self.h.scope_verifier.calls, 0)
@@ -236,8 +241,10 @@ class ScopeSubjectTests(unittest.TestCase):
             (ScopeVerifierIdentity, "scope_verifier", "_verifier_pin"),
         ):
             for changes in (
-                {"subject_ref": "private@example.invalid"}, {"trust_domain_ref": ""},
-                {"public_key_digest": "g" * 64}, {"public_key_digest": "a" * 63},
+                {"subject_ref": "private@example.invalid"},
+                {"trust_domain_ref": ""},
+                {"public_key_digest": "g" * 64},
+                {"public_key_digest": "a" * 63},
                 {"public_key_digest": None},
             ):
                 self.h = Harness()
@@ -280,8 +287,9 @@ class ScopeSubjectTests(unittest.TestCase):
 
     def test_verifier_cannot_replace_controller_pins_during_callback(self):
         def verify(evidence):
-            self.h.collector._verifier_pin = replace(self.h.scope_verifier.identity,
-                                                    subject_ref="replacement")
+            self.h.collector._verifier_pin = replace(
+                self.h.scope_verifier.identity, subject_ref="replacement"
+            )
             return True
 
         self.h.scope_verifier.verify = verify
@@ -290,9 +298,15 @@ class ScopeSubjectTests(unittest.TestCase):
     def test_direct_validation_cannot_bypass_subject_separation(self):
         evidence = self.h.scope_source.evidence
         with self.assertRaises(AgentsAPIError):
-            evidence.validate(self.h.bound, self.h.identity, NOW,
-                              self.h.scope_source, self.h.scope_source,
-                              self.h.scope_source.identity, self.h.scope_verifier.identity)
+            evidence.validate(
+                self.h.bound,
+                self.h.identity,
+                NOW,
+                self.h.scope_source,
+                self.h.scope_source,
+                self.h.scope_source.identity,
+                self.h.scope_verifier.identity,
+            )
 
     def test_fresh_separate_correct_adapters_with_same_pins_are_supported(self):
         self.h.collector._scope_source = ScopeSource()

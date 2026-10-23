@@ -28,7 +28,9 @@ Ein vertrauenswürdiger lokaler Controller provisioniert explizit:
    approved_models=frozenset({binding.model}))`. Die Modellfreigabe ist eine
    explizite lokale Richtlinie; GET-Verfügbarkeit allein erteilt sie nicht.
 4. `ProviderReadOnlyCollector(binding, identity, admin=admin, canary=canary,
-   scope_source=trusted_source, scope_verifier=independent_verifier)`.
+   scope_source=trusted_source, scope_verifier=independent_verifier,
+   scope_attestor_identity=attestor_pin, scope_verifier_identity=verifier_pin)`.
+   Beide Identitätspins werden unabhängig vom Source-Input extern provisioniert.
    Dieses Objekt kann als `collector` in DT-017 injiziert werden. Der bestehende
    Acceptance-Controller bleibt unverändert; alle bisherigen Gates gelten weiter.
 
