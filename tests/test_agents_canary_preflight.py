@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import copy
 import unittest
-from unittest import mock
+import unittest.mock
 
 from developer_team.agents_canary_preflight import (
     MAX_APPROVAL_DICT_BYTES,
@@ -230,7 +228,7 @@ class CanaryPreflightTests(unittest.TestCase):
 
     def test_non_supported_runtime_blocks_before_key_iteration(self):
         value = approval()
-        with mock.patch(
+        with unittest.mock.patch(
             "developer_team.agents_canary_preflight.platform.python_implementation",
             return_value="PyPy",
         ):
