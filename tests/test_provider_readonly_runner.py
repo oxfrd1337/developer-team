@@ -45,14 +45,20 @@ class RunnerTests(unittest.TestCase):
         self.socket = self.enterContext(
             patch("socket.socket", side_effect=AssertionError("socket"))
         )
-        self.enterContext(patch.object(
-            AdminReadOnlyHTTPS, "_connection", staticmethod(lambda *a, **k: self.h.factory("admin"))
-        ))
-        self.enterContext(patch.object(
-            CanaryReadOnlyHTTPS,
-            "_connection",
-            staticmethod(lambda *a, **k: self.h.factory("canary")),
-        ))
+        self.enterContext(
+            patch.object(
+                AdminReadOnlyHTTPS,
+                "_connection",
+                staticmethod(lambda *a, **k: self.h.factory("admin")),
+            )
+        )
+        self.enterContext(
+            patch.object(
+                CanaryReadOnlyHTTPS,
+                "_connection",
+                staticmethod(lambda *a, **k: self.h.factory("canary")),
+            )
+        )
 
     def handle(self, index, identity):
         fd = self.files[index].fileno()
@@ -60,8 +66,11 @@ class RunnerTests(unittest.TestCase):
 
     def run_runner(self, execute=True, **changes):
         result = run_readonly(
-            self.h.bound, self.h.identity, self.admin,
-            execute_real_readonly=execute, **(self.kw | changes),
+            self.h.bound,
+            self.h.identity,
+            self.admin,
+            execute_real_readonly=execute,
+            **(self.kw | changes),
         )
         self.assert_halt(result)
         self.socket.assert_not_called()
@@ -73,13 +82,23 @@ class RunnerTests(unittest.TestCase):
         self.assertIs(report["live_authorized"], False)
         raw = json.dumps(report)
         for marker in (
-            ADMIN_MARKER, SYNTHETIC_SECRET, "Bearer", "Authorization", "private-", "Traceback"
+            ADMIN_MARKER,
+            SYNTHETIC_SECRET,
+            "Bearer",
+            "Authorization",
+            "private-",
+            "Traceback",
         ):
             self.assertNotIn(marker, raw)
         for gate in (
-            "provider_contract_current", "environment_configuration", "secret_store",
-            "real_transport", "durable_journal", "single_canary_grant",
-            "fresh_create_approval", "fresh_submit_approval",
+            "provider_contract_current",
+            "environment_configuration",
+            "secret_store",
+            "real_transport",
+            "durable_journal",
+            "single_canary_grant",
+            "fresh_create_approval",
+            "fresh_submit_approval",
         ):
             self.assertEqual(report["checks"][gate], "MISSING_OR_INVALID")
 
@@ -96,14 +115,17 @@ class RunnerTests(unittest.TestCase):
         for check in ("account_project_binding", "spend_controls", "agent_configuration"):
             self.assertEqual(report["checks"][check], "PASS")
         root = self.h.root
-        self.assertEqual(self.h.calls, [
-            ("admin", "GET", root),
-            ("admin", "GET", root + "/service_accounts"),
-            ("admin", "GET", root + "/api_keys?owner_project_access=any"),
-            ("admin", "GET", root + "/spend_limit"),
-            ("canary", "GET", "/v1/models"),
-            ("canary", "GET", f"/v1/agents/{self.h.bound.agent_id}"),
-        ])
+        self.assertEqual(
+            self.h.calls,
+            [
+                ("admin", "GET", root),
+                ("admin", "GET", root + "/service_accounts"),
+                ("admin", "GET", root + "/api_keys?owner_project_access=any"),
+                ("admin", "GET", root + "/spend_limit"),
+                ("canary", "GET", "/v1/models"),
+                ("canary", "GET", f"/v1/agents/{self.h.bound.agent_id}"),
+            ],
+        )
         self.assertTrue(all(c.closed for c in self.h.connections))
 
     def test_non_boolean_consent_blocked(self):
@@ -113,8 +135,14 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(self.h.connections, [])
 
     def test_ci_and_secret_environment_never_execute(self):
-        for name in ("CI", "GITHUB_ACTIONS", "DT_PROVIDER_OFFLINE", "OPENAI_API_KEY",
-                     "OPENAI_ADMIN_API_KEY", "OPENAI_ADMIN_KEY"):
+        for name in (
+            "CI",
+            "GITHUB_ACTIONS",
+            "DT_PROVIDER_OFFLINE",
+            "OPENAI_API_KEY",
+            "OPENAI_ADMIN_API_KEY",
+            "OPENAI_ADMIN_KEY",
+        ):
             with self.subTest(name=name), patch.dict(os.environ, {name: SYNTHETIC_SECRET}):
                 self.assertEqual(self.run_runner()["outcome"], "BLOCKED")
         self.assertEqual(self.h.connections, [])
@@ -130,16 +158,22 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(self.h.connections, [])
 
     def test_swapped_descriptor_selectors_blocked_by_role_pins(self):
-        self.assertEqual(self.run_runner(
-            admin_fd=replace(self.kw["admin_fd"], descriptor=self.files[1].fileno()),
-            canary_fd=replace(self.kw["canary_fd"], descriptor=self.files[0].fileno()),
-        )["outcome"], "BLOCKED")
+        self.assertEqual(
+            self.run_runner(
+                admin_fd=replace(self.kw["admin_fd"], descriptor=self.files[1].fileno()),
+                canary_fd=replace(self.kw["canary_fd"], descriptor=self.files[0].fileno()),
+            )["outcome"],
+            "BLOCKED",
+        )
         self.assertEqual(self.h.connections, [])
 
     def test_swapped_role_handles_blocked(self):
-        self.assertEqual(self.run_runner(
-            admin_fd=self.kw["canary_fd"], canary_fd=self.kw["admin_fd"]
-        )["outcome"], "BLOCKED")
+        self.assertEqual(
+            self.run_runner(admin_fd=self.kw["canary_fd"], canary_fd=self.kw["admin_fd"])[
+                "outcome"
+            ],
+            "BLOCKED",
+        )
         self.assertEqual(self.h.connections, [])
 
     def test_same_underlying_file_blocked(self):
@@ -166,9 +200,10 @@ class RunnerTests(unittest.TestCase):
     def test_writable_fd_blocked(self):
         fd = os.open(Path(self.tmp.name) / "admin", os.O_RDWR)
         self.addCleanup(os.close, fd)
-        self.assertEqual(self.run_runner(
-            admin_fd=replace(self.kw["admin_fd"], descriptor=fd)
-        )["outcome"], "BLOCKED")
+        self.assertEqual(
+            self.run_runner(admin_fd=replace(self.kw["admin_fd"], descriptor=fd))["outcome"],
+            "BLOCKED",
+        )
         self.assertEqual(self.h.connections, [])
 
     def test_nonregular_fd_blocked(self):
@@ -200,8 +235,12 @@ class RunnerTests(unittest.TestCase):
                 self.assertEqual(len(set(self.h.calls)), 3)
 
     def test_dns_tls_timeout_errors_are_sanitized(self):
-        for fault in (socket.gaierror(ADMIN_MARKER), ssl.SSLError(SYNTHETIC_SECRET),
-                      TimeoutError(ADMIN_MARKER), ConnectionError(SYNTHETIC_SECRET)):
+        for fault in (
+            socket.gaierror(ADMIN_MARKER),
+            ssl.SSLError(SYNTHETIC_SECRET),
+            TimeoutError(ADMIN_MARKER),
+            ConnectionError(SYNTHETIC_SECRET),
+        ):
             with self.subTest(fault=type(fault)):
                 self.h.fault = fault
                 self.assertEqual(set(self.run_runner()["checks"].values()), {"MISSING_OR_INVALID"})
@@ -218,7 +257,8 @@ class RunnerTests(unittest.TestCase):
 
     def test_independent_scope_adapter_can_prove_only_scope(self):
         report = self.run_runner(
-            scope_source=self.h.scope_source, scope_verifier=self.h.scope_verifier,
+            scope_source=self.h.scope_source,
+            scope_verifier=self.h.scope_verifier,
             scope_attestor_identity=self.h.scope_source.identity,
             scope_verifier_identity=self.h.scope_verifier.identity,
         )
@@ -226,7 +266,8 @@ class RunnerTests(unittest.TestCase):
 
     def test_scope_source_verifier_self_attestation_blocked(self):
         report = self.run_runner(
-            scope_source=self.h.scope_source, scope_verifier=self.h.scope_source,
+            scope_source=self.h.scope_source,
+            scope_verifier=self.h.scope_source,
             scope_attestor_identity=self.h.scope_source.identity,
             scope_verifier_identity=self.h.scope_source.identity,
         )
@@ -274,10 +315,17 @@ class RunnerTests(unittest.TestCase):
         self.refresh_identities()
         path = Path(self.tmp.name) / "manifest.json"
         path.write_text(json.dumps(self.manifest()))
-        result = self.cli([
-            "--manifest", str(path), "--admin-fd", str(self.files[0].fileno()),
-            "--canary-fd", str(self.files[1].fileno()), "--execute-real-readonly",
-        ])
+        result = self.cli(
+            [
+                "--manifest",
+                str(path),
+                "--admin-fd",
+                str(self.files[0].fileno()),
+                "--canary-fd",
+                str(self.files[1].fileno()),
+                "--execute-real-readonly",
+            ]
+        )
         self.assertEqual(result["outcome"], "COLLECTED")
         self.assertEqual(result["checks"]["account_project_binding"], "PASS")
         self.assertEqual(len(self.h.calls), 6)
@@ -287,10 +335,16 @@ class RunnerTests(unittest.TestCase):
         path = Path(self.tmp.name) / "manifest.json"
         path.write_text(json.dumps(self.manifest()))
         with patch("os.pread", side_effect=AssertionError("read")):
-            result = self.cli([
-                "--manifest", str(path), "--admin-fd", str(self.files[0].fileno()),
-                "--canary-fd", str(self.files[1].fileno()),
-            ])
+            result = self.cli(
+                [
+                    "--manifest",
+                    str(path),
+                    "--admin-fd",
+                    str(self.files[0].fileno()),
+                    "--canary-fd",
+                    str(self.files[1].fileno()),
+                ]
+            )
         self.assertEqual(result["outcome"], "NOT_EXECUTED")
         self.assertEqual(self.h.connections, [])
 

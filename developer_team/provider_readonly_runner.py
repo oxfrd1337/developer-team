@@ -196,7 +196,11 @@ def _manifest(path):
         raise AgentsAPIError("manifest_too_large")
     value = json.loads(raw, object_pairs_hook=_pairs)
     if type(value) is not dict or set(value) != {
-        "binding", "canary_identity", "admin_identity", "admin_fd_pin", "canary_fd_pin",
+        "binding",
+        "canary_identity",
+        "admin_identity",
+        "admin_fd_pin",
+        "canary_fd_pin",
         "approved_models",
     }:
         raise AgentsAPIError("invalid_manifest_fields")
@@ -224,7 +228,9 @@ def main(argv=None):
         args = parser.parse_args(argv)
         value, binding, identity, admin = _manifest(args.manifest)
         report = run_readonly(
-            binding, identity, admin,
+            binding,
+            identity,
+            admin,
             admin_fd=ExternalFD(args.admin_fd, admin, tuple(value["admin_fd_pin"])),
             canary_fd=ExternalFD(args.canary_fd, identity, tuple(value["canary_fd_pin"])),
             approved_models=frozenset(value["approved_models"]),
