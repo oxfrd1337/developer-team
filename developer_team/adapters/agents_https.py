@@ -246,6 +246,8 @@ class HardenedHTTPS:
             raise AgentsAPIError("https_deadline_exceeded")
         results = queue.Queue(maxsize=1)
         stopped = threading.Event()
+        connected = threading.Event()
+        connect_deadline = min(request.deadline, self._clock() + self._connect_timeout)
         connections = []
 
         def abort():
@@ -268,7 +270,10 @@ class HardenedHTTPS:
                     *args, header_limit=min(8192, request.max_response_bytes), **kwargs
                 )
                 conn.auto_open = 0  # Never reconnect implicitly after a deadline closes the socket.
-                conn.connect()  # DNS/TLS may block; outer wait still has an absolute deadline.
+                conn.connect()  # The caller also bounds the complete DNS/TCP/TLS phase.
+                if stopped.is_set() or self._clock() >= connect_deadline:
+                    return
+                connected.set()
                 if stopped.is_set() or self._clock() >= request.deadline:
                     return
                 conn.sock.settimeout(min(self._read_timeout, request.deadline - self._clock()))
@@ -303,6 +308,7 @@ class HardenedHTTPS:
             except Exception:
                 response = None
             finally:
+                connected.set()  # Wake the caller on an early connect failure, too.
                 if conn is not None:
                     try:
                         conn.close()
@@ -313,7 +319,11 @@ class HardenedHTTPS:
         threading.Thread(target=worker, daemon=True).start()
         result = None
         try:
-            result = results.get(timeout=max(0, request.deadline - self._clock()))
+            if not connected.wait(timeout=max(0, connect_deadline - self._clock())):
+                raise AgentsAPIError("https_connect_deadline_exceeded")
+            result = results.get(
+                timeout=max(0, min(self._read_timeout, request.deadline - self._clock()))
+            )
         except queue.Empty:
             result = None
         finally:

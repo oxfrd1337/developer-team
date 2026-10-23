@@ -56,7 +56,7 @@ Bindungen sperren ohne Echo der Eingangswerte.
 | secret_store | externer lesbarer Store, Ausschluss aus Chat/Git/Prompts/Logs; zusätzlich reale lesende Probe des injizierten Handles ohne Socket |
 | agent_configuration | Agent-ID, verfügbares und zugelassenes Modell, Digest der vollständig gepinnten Konfiguration |
 | environment_configuration | Digest, network=disabled, container_size=small |
-| single_canary_grant | exakte Bindung/Budget, ein Create/eine Nachricht, externe exklusive Eigentümerschaft, Grantreferenz |
+| single_canary_grant | exakte Bindung/Budget, ein Create/eine Nachricht, externe exklusive Eigentümerschaft, Grantreferenz und ursprünglicher Grantzeitraum (höchstens 3.600 Sekunden) |
 
 `real_transport` bewertet das Vorhandensein des implementierten festen Transports;
 **PASS bedeutet hier keine erfolgreiche echte Providerkommunikation**.
@@ -95,8 +95,11 @@ Ein konfigurierter HTTPS-Proxy wird als HTTP-CONNECT-Proxy berücksichtigt; unzu
 Proxyformen sperren ohne direkten Fallback. Redirects werden nicht verfolgt, Fehlerkörper
 und sämtliche Responseheader verworfen, Mutationen niemals wiederholt. Connect und Read
 sind jeweils auf höchstens zwei Sekunden voreingestellt; die absolute DT-016-Deadline
-begrenzt zusätzlich DNS, TLS, Header und inkrementelles Lesen. Responsegröße maximal
-65.536 Bytes, Requestbudget unverändert im Journal gebunden.
+begrenzt zusätzlich DNS, TLS, Header und inkrementelles Lesen. Die komplette
+DNS-/TCP-/TLS-Phase und die komplette Read-Phase haben jeweils eine eigene absolute
+Deadline. Header einschließlich Statuszeile maximal 8.192 Bytes, Body maximal
+65.536 Bytes, Requestbudget unverändert im Journal gebunden. Implizites Wiederverbinden
+nach einem Verbindungsabbruch ist deaktiviert.
 
 Bei Gesamt-Timeout wird die Verbindung beendet und eine verspätete Antwort verworfen.
 Ein im Betriebssystem hängender DNS-Worker kann erst nach Rückkehr beendet werden;

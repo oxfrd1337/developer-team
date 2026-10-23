@@ -289,3 +289,24 @@ class HTTPSTests(unittest.TestCase):
     def test_no_implicit_reconnect_after_connection_is_closed(self):
         self.transport.exchange(self.request())
         self.assertEqual(self.conn.auto_open, 0)
+
+    def test_complete_dns_tcp_tls_phase_has_its_own_absolute_deadline(self):
+        release = threading.Event()
+        self.conn.connect = lambda: release.wait(2)
+        self.transport._connect_timeout = 0.03
+        started = time.monotonic()
+        with self.assertRaises(AgentsAPIError):
+            self.transport.exchange(self.request())
+        self.assertLess(time.monotonic() - started, 1)
+        release.set()
+        self.assertFalse(self.conn.sent)
+
+    def test_complete_read_phase_has_its_own_absolute_deadline(self):
+        release = threading.Event()
+        self.conn.getresponse = lambda: release.wait(2)
+        self.transport._read_timeout = 0.03
+        started = time.monotonic()
+        with self.assertRaises(AgentsAPIError):
+            self.transport.exchange(self.request())
+        self.assertLess(time.monotonic() - started, 1)
+        release.set()
