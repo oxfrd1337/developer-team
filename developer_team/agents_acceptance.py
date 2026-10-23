@@ -19,10 +19,10 @@ from .adapters.agents_api_contracts import (
     AgentsAPILimits,
     CanaryBinding,
     ExternalPermit,
+    WireResponse,
     bounded_int,
     safe_ref,
     sha256,
-    WireResponse,
 )
 from .adapters.agents_api_journal import SQLiteCanaryJournal
 from .adapters.agents_https import HardenedHTTPS
@@ -135,8 +135,10 @@ class ReadOnlyVerifier:
                     and observation.check == check
                     and observation.binding_digest == binding.digest
                     and safe_ref(observation.verifier_ref)
-                    and observation.source == (
-                        "official_documentation" if check == "provider_contract_current"
+                    and observation.source
+                    == (
+                        "official_documentation"
+                        if check == "provider_contract_current"
                         else "controlled_account_readonly"
                     )
                     and bounded_int(now, 0, 2**53)
@@ -173,9 +175,16 @@ class AcceptanceController:
     """
 
     def __init__(
-        self, binding: CanaryBinding, connection: sqlite3.Connection, *,
-        collector=None, secret_store=None, operator_broker=None,
-        connection_factory=None, limits=None, now=time.time,
+        self,
+        binding: CanaryBinding,
+        connection: sqlite3.Connection,
+        *,
+        collector=None,
+        secret_store=None,
+        operator_broker=None,
+        connection_factory=None,
+        limits=None,
+        now=time.time,
     ):
         binding.validate()
         self._binding, self._connection, self._now = binding, connection, now
@@ -184,12 +193,18 @@ class AcceptanceController:
         self._limits = limits or AgentsAPILimits()
         self._journal = SQLiteCanaryJournal(connection)
         self._transport = HardenedHTTPS(
-            binding, secret_store, mutation_gate=self._wire_gate,
+            binding,
+            secret_store,
+            mutation_gate=self._wire_gate,
             connection_factory=connection_factory,
         )
         self._adapter = AgentsAPIAdapter(
-            binding, self._journal, transport=self._transport, gate=self,
-            limits=self._limits, now=now,
+            binding,
+            self._journal,
+            transport=self._transport,
+            gate=self,
+            limits=self._limits,
+            now=now,
         )
         try:
             connection.execute(
@@ -233,7 +248,8 @@ class AcceptanceController:
             return (
                 any(row[1] == "main" and row[2] for row in databases)
                 and self._connection.execute("PRAGMA synchronous").fetchone()[0] == 2
-                and self._connection.execute("PRAGMA journal_mode").fetchone()[0] in {"delete", "wal"}
+                and self._connection.execute("PRAGMA journal_mode").fetchone()[0]
+                in {"delete", "wal"}
             )
         except Exception:
             return False
@@ -253,9 +269,9 @@ class AcceptanceController:
                 self._binding.project_id, lambda _: WireResponse(204)
             ) == WireResponse(204)
         except Exception:
-            pass
+            secret_ready = False
         if not secret_ready:
-            checks["secret_store"] = "MISSING_OR_INVALID"
+            checks["secret_store"] = "MISSING_OR_INVALID"  # noqa: S105 - gate status, no secret
         checks["real_transport"] = "PASS" if type(self._transport) is HardenedHTTPS else "MISSING"
         checks["durable_journal"] = "PASS" if self._durable() else "MISSING"
         return checks, observations, after
@@ -264,9 +280,13 @@ class AcceptanceController:
         checks, _, _ = self._inspect()
         return {
             "mode": "dt017-pre-live-acceptance",
-            "checks": {**{name: checks[name] for name in CHECKS},
-                       "fresh_create_approval": "MISSING", "fresh_submit_approval": "MISSING"},
-            "live": "NO-GO", "live_authorized": False,
+            "checks": {
+                **{name: checks[name] for name in CHECKS},
+                "fresh_create_approval": "MISSING",
+                "fresh_submit_approval": "MISSING",
+            },
+            "live": "NO-GO",
+            "live_authorized": False,
             "operator_halt": "SEPARATE_FRESH_APPROVAL_REQUIRED_BEFORE_EACH_POST",
             "validation": "OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.",
         }
@@ -275,7 +295,11 @@ class AcceptanceController:
         if operation not in {*APPROVALS, "cancel"}:
             raise AgentsAPIError("invalid_review_operation")
         _, state = self._journal.load(self._binding)
-        expected = {"create_session": "PREPARED", "submit_canary": "SESSION_READY", "cancel": "TURN_BOUND"}
+        expected = {
+            "create_session": "PREPARED",
+            "submit_canary": "SESSION_READY",
+            "cancel": "TURN_BOUND",
+        }
         if state.phase != expected[operation]:
             raise AgentsAPIError("review_out_of_order")
         # Reads before issuing the separate submit challenge verify effective config.
@@ -295,7 +319,8 @@ class AcceptanceController:
         try:
             with self._connection:
                 self._connection.execute(
-                    "UPDATE dt017_control SET challenge=?,operation=?,reviewed_at=?,session_digest=? "
+                    "UPDATE dt017_control SET challenge=?,operation=?,reviewed_at=?,"
+                    "session_digest=? "
                     "WHERE slot=1 AND binding=?",
                     (challenge, operation, now, session_digest, self._binding.digest),
                 )
@@ -314,7 +339,7 @@ class AcceptanceController:
         try:
             approval = self._broker.read_approval(self._binding, operation, slot[1])
         except Exception:
-            pass
+            approval = None
         if (
             type(approval) is not OperatorApproval
             or approval.broker_verified is not True
@@ -346,22 +371,38 @@ class AcceptanceController:
         expiry = min(o.expires_at for key, o in observations.items() if key in required)
         grant = observations.get("single_canary_grant")
         permit = ExternalPermit(
-            binding_digest=b.digest, project_id=b.project_id, credential_project_id=b.project_id,
-            agent_id=b.agent_id, key_capabilities=MINIMAL_CAPABILITIES,
-            project_capabilities=MINIMAL_CAPABILITIES, project_hard_limit_cents=b.budget_cents,
-            observed_at=earliest, expires_at=expiry,
-            grant_binding_digest=b.digest, grant_budget_cents=b.budget_cents,
+            binding_digest=b.digest,
+            project_id=b.project_id,
+            credential_project_id=b.project_id,
+            agent_id=b.agent_id,
+            key_capabilities=MINIMAL_CAPABILITIES,
+            project_capabilities=MINIMAL_CAPABILITIES,
+            project_hard_limit_cents=b.budget_cents,
+            observed_at=earliest,
+            expires_at=expiry,
+            grant_binding_digest=b.digest,
+            grant_budget_cents=b.budget_cents,
             grant_issued_at=grant.observed_at if grant else 0,
             grant_expires_at=grant.expires_at if grant else 0,
-            secret_store_verified=True, spend_controls_verified=checks["spend_controls"] == "PASS",
-            contract_verified=True, agent_configuration_verified=True,
+            secret_store_verified=True,
+            spend_controls_verified=checks["spend_controls"] == "PASS",
+            contract_verified=True,
+            agent_configuration_verified=True,
             operator_grant_verified=checks["single_canary_grant"] == "PASS",
-            **({
-                {"create_session": "create", "submit_canary": "submit", "cancel": "cancel"}[operation]
-                + "_approved_at": approval.issued_at,
-                {"create_session": "create", "submit_canary": "submit", "cancel": "cancel"}[operation]
-                + "_approval_binding_digest": b.digest,
-            } if approval else {}),
+            **(
+                {
+                    {"create_session": "create", "submit_canary": "submit", "cancel": "cancel"}[
+                        operation
+                    ]
+                    + "_approved_at": approval.issued_at,
+                    {"create_session": "create", "submit_canary": "submit", "cancel": "cancel"}[
+                        operation
+                    ]
+                    + "_approval_binding_digest": b.digest,
+                }
+                if approval
+                else {}
+            ),
         )
         permit.validate(b, operation, int(self._now()))
         return permit
@@ -369,7 +410,10 @@ class AcceptanceController:
     def _wire_gate(self, binding, operation, path):
         self.authorize(binding, operation, int(self._now()))
         _, state = self._journal.load(binding)
-        if operation != "create_session" and path != f"/v1/agents/sessions/{state.session_id}/events":
+        if (
+            operation != "create_session"
+            and path != f"/v1/agents/sessions/{state.session_id}/events"
+        ):
             raise AgentsAPIError("wire_session_binding_mismatch")
 
     def execute(self, operation):
@@ -383,7 +427,8 @@ class AcceptanceController:
                 with self._connection:
                     self._connection.execute(
                         "UPDATE dt017_control SET challenge=NULL,operation=NULL,reviewed_at=NULL,"
-                        "session_digest=NULL WHERE slot=1 AND binding=?", (self._binding.digest,)
+                        "session_digest=NULL WHERE slot=1 AND binding=?",
+                        (self._binding.digest,),
                     )
             except sqlite3.Error:
                 raise AgentsAPIError("approval_invalidation_failed") from None
@@ -406,7 +451,8 @@ class AcceptanceController:
             with self._connection:
                 changed = self._connection.execute(
                     "UPDATE dt017_control SET cleanup_requested=1 WHERE slot=1 AND binding=? "
-                    "AND cleanup_requested=0", (self._binding.digest,)
+                    "AND cleanup_requested=0",
+                    (self._binding.digest,),
                 ).rowcount
             if changed != 1:
                 raise AgentsAPIError("cleanup_already_requested")

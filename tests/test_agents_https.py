@@ -29,11 +29,21 @@ class HTTPSTests(unittest.TestCase):
         )
 
     def request(self, **changes):
-        return replace(WireRequest(
-            "GET", "https://api.openai.com/v1/agents/sessions/session_synthetic",
-            (("OpenAI-Beta", "agents=v1"), ("OpenAI-Project", self.bound.project_id),
-             ("Content-Type", "application/json")), None, time.monotonic() + 5, 65536,
-        ), **changes)
+        return replace(
+            WireRequest(
+                "GET",
+                "https://api.openai.com/v1/agents/sessions/session_synthetic",
+                (
+                    ("OpenAI-Beta", "agents=v1"),
+                    ("OpenAI-Project", self.bound.project_id),
+                    ("Content-Type", "application/json"),
+                ),
+                None,
+                time.monotonic() + 5,
+                65536,
+            ),
+            **changes,
+        )
 
     def test_success_discards_response_headers_and_closes_connection(self):
         response = self.transport.exchange(self.request())
@@ -48,7 +58,8 @@ class HTTPSTests(unittest.TestCase):
             "https://api.openai.com.evil/v1/agents/sessions/session_synthetic",
             "https://api.openai.com:443/v1/agents/sessions/session_synthetic",
             "https://evil@api.openai.com/v1/agents/sessions/session_synthetic",
-            "https://api.openai.com/v1/files", "https://api.openai.com/v1/agents/sessions/../files",
+            "https://api.openai.com/v1/files",
+            "https://api.openai.com/v1/agents/sessions/../files",
             "https://api.openai.com/v1/agents/sessions/session_synthetic#secret",
             "https://api.openai.com/v1/agents/sessions/session_synthetic?foo=bar",
             "https://api.openai.com/v1/agents/sessions/%2e%2e",
@@ -60,7 +71,8 @@ class HTTPSTests(unittest.TestCase):
     def test_wrong_project_duplicate_auth_or_extra_headers_block(self):
         headers = self.request().headers
         for value in (
-            (), headers + (("Authorization", "Bearer " + SYNTHETIC_SECRET),),
+            (),
+            headers + (("Authorization", "Bearer " + SYNTHETIC_SECRET),),
             headers + (("OpenAI-Project", self.bound.project_id),),
             (headers[0], ("OpenAI-Project", "other"), headers[2]),
             headers + (("X-Anything", "\r\nsecret"),),
@@ -71,11 +83,17 @@ class HTTPSTests(unittest.TestCase):
 
     def test_methods_free_bodies_and_oversized_limits_block(self):
         for changes in (
-            {"method": "DELETE"}, {"method": "PUT"}, {"method": "post"},
+            {"method": "DELETE"},
+            {"method": "PUT"},
+            {"method": "post"},
             {"method": "POST", "body": b'{"prompt":"anything"}'},
-            {"body": b"{}"}, {"max_response_bytes": 65537}, {"max_response_bytes": True},
-            {"deadline": float("nan")}, {"deadline": float("inf")},
-            {"deadline": time.monotonic() - 1}, {"deadline": time.monotonic() + 60},
+            {"body": b"{}"},
+            {"max_response_bytes": 65537},
+            {"max_response_bytes": True},
+            {"deadline": float("nan")},
+            {"deadline": float("inf")},
+            {"deadline": time.monotonic() - 1},
+            {"deadline": time.monotonic() + 60},
         ):
             with self.assertRaises(AgentsAPIError):
                 self.transport.exchange(self.request(**changes))
@@ -106,8 +124,12 @@ class HTTPSTests(unittest.TestCase):
         self.assertEqual(len(self.wire.calls), 11)
 
     def test_dns_tls_connection_timeout_exceptions_never_leak_or_retry(self):
-        for fault in (OSError(SYNTHETIC_SECRET), ssl.SSLError(SYNTHETIC_SECRET),
-                      ConnectionError(SYNTHETIC_SECRET), TimeoutError(SYNTHETIC_SECRET)):
+        for fault in (
+            OSError(SYNTHETIC_SECRET),
+            ssl.SSLError(SYNTHETIC_SECRET),
+            ConnectionError(SYNTHETIC_SECRET),
+            TimeoutError(SYNTHETIC_SECRET),
+        ):
             self.conn.fault = fault
             with self.assertRaises(AgentsAPIError) as caught:
                 self.transport.exchange(self.request())
@@ -119,7 +141,9 @@ class HTTPSTests(unittest.TestCase):
 
     def test_response_size_incremental_limit_and_exact_boundary(self):
         self.conn.body = b"x" * 1024
-        self.assertEqual(len(self.transport.exchange(self.request(max_response_bytes=1024)).body), 1024)
+        self.assertEqual(
+            len(self.transport.exchange(self.request(max_response_bytes=1024)).body), 1024
+        )
         self.conn.body = b"x" * 1025
         with self.assertRaises(AgentsAPIError):
             self.transport.exchange(self.request(max_response_bytes=1024))
@@ -127,9 +151,11 @@ class HTTPSTests(unittest.TestCase):
     def test_total_deadline_bounds_dns_and_prevents_late_request(self):
         release = threading.Event()
         connected = threading.Event()
+
         def slow_connect():
             connected.set()
             release.wait(2)
+
         self.conn.connect = slow_connect
         started = time.monotonic()
         with self.assertRaises(AgentsAPIError):
@@ -144,12 +170,12 @@ class HTTPSTests(unittest.TestCase):
             conn = WireConnection(self.wire)
             release = threading.Event()
             if phase == "headers":
-                conn.getresponse = lambda: release.wait(2)
+                conn.getresponse = lambda release=release: release.wait(2)
             else:
                 raw = io.BytesIO(b"x")
                 raw.status = 200
-                raw.read1 = lambda count: release.wait(2)
-                conn.getresponse = lambda: raw
+                raw.read1 = lambda count, release=release: release.wait(2)
+                conn.getresponse = lambda raw=raw: raw
             self.factory.return_value = conn
             started = time.monotonic()
             with self.assertRaises(AgentsAPIError):
@@ -171,19 +197,38 @@ class HTTPSTests(unittest.TestCase):
                 HardenedHTTPS(self.bound, read_timeout=value)
 
     def test_proxy_route_and_tls_validation_remain_enabled(self):
-        with patch("developer_team.adapters.agents_https.getproxies", return_value={"https": "http://proxy:8080"}), patch("http.client.HTTPSConnection") as factory:
+        with (
+            patch(
+                "developer_team.adapters.agents_https.getproxies",
+                return_value={"https": "http://proxy:8080"},
+            ),
+            patch("http.client.HTTPSConnection") as factory,
+        ):
             HardenedHTTPS._connection(2)
             factory.return_value.set_tunnel.assert_called_once_with("api.openai.com", 443)
             context = factory.call_args.kwargs["context"]
             self.assertTrue(context.check_hostname)
             self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
-        with patch("developer_team.adapters.agents_https.getproxies", return_value={}), patch("http.client.HTTPSConnection") as factory:
+        with (
+            patch("developer_team.adapters.agents_https.getproxies", return_value={}),
+            patch("http.client.HTTPSConnection") as factory,
+        ):
             HardenedHTTPS._connection(2)
             self.assertEqual(factory.call_args.args[:2], ("api.openai.com", 443))
 
     def test_unsupported_proxy_refuses_without_direct_fallback(self):
-        for proxy in ("https://proxy", "http://user:secret@proxy", "http://proxy/path", "http://proxy?q=x"):
-            with patch("developer_team.adapters.agents_https.getproxies", return_value={"https": proxy}), patch("http.client.HTTPSConnection") as factory:
+        for proxy in (
+            "https://proxy",
+            "http://user:secret@proxy",
+            "http://proxy/path",
+            "http://proxy?q=x",
+        ):
+            with (
+                patch(
+                    "developer_team.adapters.agents_https.getproxies", return_value={"https": proxy}
+                ),
+                patch("http.client.HTTPSConnection") as factory,
+            ):
                 with self.assertRaises(AgentsAPIError):
                     HardenedHTTPS._connection(2)
                 factory.assert_not_called()
@@ -194,7 +239,9 @@ class HTTPSTests(unittest.TestCase):
             stream.write(SYNTHETIC_SECRET.encode())
             stream.flush()
             store = FDSecretStore(stream.fileno(), self.bound.project_id)
-            result = store.with_authorization(self.bound.project_id, lambda value: WireResponse(204))
+            result = store.with_authorization(
+                self.bound.project_id, lambda value: WireResponse(204)
+            )
             self.assertEqual(result, WireResponse(204))
             self.assertNotIn(SYNTHETIC_SECRET, repr(store))
             for project in ("other", None):

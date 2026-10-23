@@ -11,7 +11,7 @@ from developer_team.adapters.agents_api_contracts import MINIMAL_CAPABILITIES, W
 from developer_team.agents_acceptance import AcceptanceController, Observation, OperatorApproval
 from tests.agents_api_support import NOW, FixtureTransport, binding
 
-SYNTHETIC_SECRET = "synthetic-wire-marker-never-a-real-key"
+SYNTHETIC_SECRET = "synthetic-wire-marker-never-a-real-key"  # noqa: S105 - test marker
 
 
 class Collector:
@@ -19,12 +19,16 @@ class Collector:
         b = bound or binding()
         facts = {
             "provider_contract_current": {
-                "contract": "dt016-agents-v1", "origin": "https://developers.openai.com",
-                "session_creation_billable": True, "spend_enforcement_delayed": True,
+                "contract": "dt016-agents-v1",
+                "origin": "https://developers.openai.com",
+                "session_creation_billable": True,
+                "spend_enforcement_delayed": True,
             },
             "account_project_binding": {
-                "project_id": b.project_id, "credential_project_id": b.project_id,
-                "service_account_ref": "sa_synthetic", "credential_ref": "key_synthetic",
+                "project_id": b.project_id,
+                "credential_project_id": b.project_id,
+                "service_account_ref": "sa_synthetic",
+                "credential_ref": "key_synthetic",
             },
             "credential_scope": {
                 "key_capabilities": sorted(MINIMAL_CAPABILITIES),
@@ -34,28 +38,44 @@ class Collector:
             },
             "spend_controls": {"project_limit_cents": b.budget_cents, "enforcement_delayed": True},
             "secret_store": {
-                "external": True, "readable": True, "excluded_from_chat_git_prompts_logs": True,
+                "external": True,
+                "readable": True,
+                "excluded_from_chat_git_prompts_logs": True,
             },
             "agent_configuration": {
-                "agent_id": b.agent_id, "model": b.model, "model_available": True,
-                "model_approved": True, "configuration_digest": sha256(b.agent_configuration),
+                "agent_id": b.agent_id,
+                "model": b.model,
+                "model_available": True,
+                "model_approved": True,
+                "configuration_digest": sha256(b.agent_configuration),
             },
             "environment_configuration": {
                 "configuration_digest": sha256(b.environment_configuration),
-                "network": "disabled", "container_size": "small",
+                "network": "disabled",
+                "container_size": "small",
             },
             "single_canary_grant": {
-                "binding_digest": b.digest, "budget_cents": b.budget_cents,
-                "max_sessions": 1, "max_messages": 1, "exclusive_external_ownership": True,
+                "binding_digest": b.digest,
+                "budget_cents": b.budget_cents,
+                "max_sessions": 1,
+                "max_messages": 1,
+                "exclusive_external_ownership": True,
                 "grant_ref": "grant_synthetic",
             },
         }
         self.observations = {
             name: Observation(
-                name, b.digest, NOW, NOW + 300,
-                "official_documentation" if name == "provider_contract_current"
-                else "controlled_account_readonly", "verifier_synthetic", value,
-            ) for name, value in facts.items()
+                name,
+                b.digest,
+                NOW,
+                NOW + 300,
+                "official_documentation"
+                if name == "provider_contract_current"
+                else "controlled_account_readonly",
+                "verifier_synthetic",
+                value,
+            )
+            for name, value in facts.items()
         }
 
     def read(self, bound, check):
@@ -103,8 +123,14 @@ class WireConnection:
         assert headers.pop("Authorization") == "Bearer " + SYNTHETIC_SECRET
         headers.pop("Accept-Encoding")
         order = ("OpenAI-Beta", "OpenAI-Project", "Content-Type", "Idempotency-Key")
-        request = WireRequest(method, "https://api.openai.com" + path,
-                              tuple((k, headers[k]) for k in order if k in headers), body, 0, 65536)
+        request = WireRequest(
+            method,
+            "https://api.openai.com" + path,
+            tuple((k, headers[k]) for k in order if k in headers),
+            body,
+            0,
+            65536,
+        )
         self.sent = True
         self.response = self.wire.exchange(request)
 
@@ -138,8 +164,13 @@ class AcceptanceHarness:
 
     def restart(self):
         return AcceptanceController(
-            self.bound, self.connection, collector=self.collector, secret_store=SyntheticStore(),
-            operator_broker=self.broker, connection_factory=self.factory, now=lambda: self.clock,
+            self.bound,
+            self.connection,
+            collector=self.collector,
+            secret_store=SyntheticStore(),
+            operator_broker=self.broker,
+            connection_factory=self.factory,
+            now=lambda: self.clock,
         )
 
     def create(self):

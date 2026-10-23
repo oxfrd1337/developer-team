@@ -59,7 +59,7 @@ class FDSecretStore:
                 raise ValueError
             result = send("Bearer " + secret.decode("ascii"))
         except Exception:
-            pass  # Never propagate/chain a secret-store or wire exception.
+            result = None  # Never propagate/chain a secret-store or wire exception.
         if type(result) is not WireResponse:
             raise AgentsAPIError("secret_or_transport_unavailable")
         return result
@@ -160,9 +160,17 @@ class HardenedHTTPS:
                 raise AgentsAPIError("invalid_create_body")
         elif request.method == "POST" and re.fullmatch(session + "/events", path):
             message = {
-                "events": [{"type": "agent.session.input.message", "input": [{
-                    "role": "user", "content": [{"type": "input_text", "text": CANARY_MESSAGE}]
-                }]}]
+                "events": [
+                    {
+                        "type": "agent.session.input.message",
+                        "input": [
+                            {
+                                "role": "user",
+                                "content": [{"type": "input_text", "text": CANARY_MESSAGE}],
+                            }
+                        ],
+                    }
+                ]
             }
             cancel = {"events": [{"type": "agent.session.input.cancel"}]}
             if request.body == canonical(message):
@@ -191,15 +199,16 @@ class HardenedHTTPS:
                 lambda authorization: self._bounded(request, path, operation, authorization),
             )
         except Exception:
-            pass
+            result = None
         if type(result) is not WireResponse:
             raise AgentsAPIError("https_exchange_failed_reconcile_required")
         return result
 
     def _bounded(self, request, path, operation, authorization):
-        if type(authorization) is not str or re.fullmatch(
-            r"Bearer [A-Za-z0-9_-]{1,512}", authorization
-        ) is None:
+        if (
+            type(authorization) is not str
+            or re.fullmatch(r"Bearer [A-Za-z0-9_-]{1,512}", authorization) is None
+        ):
             raise AgentsAPIError("invalid_external_authorization")
         remaining = request.deadline - self._clock()
         if remaining <= 0:
@@ -216,7 +225,7 @@ class HardenedHTTPS:
                         conn.sock.shutdown(socket.SHUT_RDWR)
                     conn.close()
                 except Exception:
-                    pass
+                    continue
 
         def worker():
             response = None
@@ -224,6 +233,7 @@ class HardenedHTTPS:
             try:
                 conn = self._factory(min(self._connect_timeout, remaining))
                 connections.append(conn)
+                conn.auto_open = 0  # Never reconnect implicitly after a deadline closes the socket.
                 conn.connect()  # DNS/TLS may block; outer wait still has an absolute deadline.
                 if stopped.is_set() or self._clock() >= request.deadline:
                     return
@@ -257,13 +267,13 @@ class HardenedHTTPS:
                         chunks.append(chunk)
                     response = WireResponse(raw.status, b"".join(chunks))
             except Exception:
-                pass
+                response = None
             finally:
                 if conn is not None:
                     try:
                         conn.close()
                     except Exception:
-                        pass
+                        response = None
                 results.put(response)
 
         threading.Thread(target=worker, daemon=True).start()
@@ -271,7 +281,7 @@ class HardenedHTTPS:
         try:
             result = results.get(timeout=max(0, request.deadline - self._clock()))
         except queue.Empty:
-            pass
+            result = None
         finally:
             abort()
         if self._clock() >= request.deadline or type(result) is not WireResponse:
