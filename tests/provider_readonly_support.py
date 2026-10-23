@@ -136,16 +136,17 @@ class Harness:
                 "status": "active",
                 "name": "private-project-name",
             },
-            self.root
-            + "/service_accounts": {"object": "list", "data": [account], "has_more": False},
-            self.root
-            + "/api_keys?owner_project_access=any": {
+            self.root + "/service_accounts": {
+                "object": "list",
+                "data": [account],
+                "has_more": False,
+            },
+            self.root + "/api_keys?owner_project_access=any": {
                 "object": "list",
                 "data": [key],
                 "has_more": False,
             },
-            self.root
-            + "/spend_limit": {
+            self.root + "/spend_limit": {
                 "object": "project.spend_limit",
                 "currency": "USD",
                 "interval": "month",
