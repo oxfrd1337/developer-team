@@ -129,7 +129,8 @@ class AgentsAPIContractTests(unittest.TestCase):
 
     def test_no_free_prompt_or_task_parameter_exists(self):
         for args in (
-            {"prompt": SENSITIVE_MARKER}, {"task": "different task"}, {"message": "different message"}
+            {"prompt": SENSITIVE_MARKER},
+            {"task": "different task"}, {"message": "different message"}
         ):
             with self.assertRaises(TypeError):
                 self.h.adapter.submit_canary(**args)
@@ -318,7 +319,9 @@ class AgentsAPIContractTests(unittest.TestCase):
         self.h.transport.session["error"] = SENSITIVE_MARKER
         self.h.adapter.reconcile()
         rendered = json.dumps(self.h.adapter.report())
-        for value in (SENSITIVE_MARKER, SESSION, TURN, self.h.binding.idempotency_key, "Authorization"):
+        for value in (
+            SENSITIVE_MARKER, SESSION, TURN, self.h.binding.idempotency_key, "Authorization"
+        ):
             self.assertNotIn(value, rendered)
         for key in (
             "live_authorized", "github_write_authorized",
@@ -461,7 +464,9 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
                         h.adapter.create_session()
                     elif operation == "cancel":
                         h.active()
-                    h.transport.faults[operation].append(WireResponse(status, SENSITIVE_MARKER.encode()))
+                    h.transport.faults[operation].append(
+                        WireResponse(status, SENSITIVE_MARKER.encode())
+                    )
                     action = {
                         "create": h.adapter.create_session,
                         "message": h.adapter.submit_canary, "cancel": h.adapter.cancel,
@@ -478,7 +483,9 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
     def test_read_failures_keep_binding_and_do_not_resubmit(self):
         self.h.active()
         for status in (401, 403, 429, 500, 503):
-            self.h.transport.faults["session"].append(WireResponse(status, SENSITIVE_MARKER.encode()))
+            self.h.transport.faults["session"].append(
+                WireResponse(status, SENSITIVE_MARKER.encode())
+            )
             with self.assertRaises(AgentsAPIError):
                 self.h.adapter.reconcile()
         self.assertEqual(self.h.state().turn_id, TURN)
@@ -540,7 +547,8 @@ class AgentsAPITransportSafetyTests(unittest.TestCase):
 
     def test_malformed_session_binding_safety_or_spend_controls_never_unlock_message(self):
         cases = (
-            {"id": SENSITIVE_MARKER}, {"id": "bad/id"}, {"metadata": {}}, {"project_id": "proj_foreign"},
+            {"id": SENSITIVE_MARKER}, {"id": "bad/id"}, {"metadata": {}},
+            {"project_id": "proj_foreign"},
             {"agent": None}, {"environment": None}, {"status": {}}, {"vault_ids": ["private"]},
             {"spend_control": None}, {"spend_control": {"limit": 6, "consumed": 0}},
             {"spend_control": {"limit": True, "consumed": 0}},
