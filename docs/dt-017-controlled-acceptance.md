@@ -20,7 +20,7 @@ Der Controller benötigt drei **unabhängig kontrollierte Integrationen**:
 1. `collector.read(binding, check)` erhebt lesend aktuelle Account-/Dashboard- bzw.
    offizielle Vertragsnachweise und liefert `Observation`. Kein JSON-Report,
    Agentenergebnis oder selbst attestierter CI-Lauf darf diese Integration ersetzen.
-2. `secret_store.with_authorization(project_id, send)` injiziert den Header nur in
+2. `secret_store.with_authorization(expected_identity, send)` injiziert den Header nur in
    den vertrauenswürdigen Wire-Code und liefert ausschließlich `WireResponse` zurück.
    `FDSecretStore` implementiert dies für einen bereits extern geöffneten, privaten,
    regulären Dateideskriptor desselben Betriebssystembenutzers. Kein Pfad-/Env-Lookup,
@@ -38,6 +38,30 @@ abbilden. Es werden keine unbestätigten OpenAI-Permissionnamen oder Account-End
 erfunden. Account-/Adminbeobachtung verwendet bei Bedarf eine getrennte lesende
 Betreiberidentität; der Canary-Key bekommt dafür keine zusätzlichen Rechte.
 
+## Reviewkorrekturen für PR #35
+
+Beide Inline-Befunde werden als Merge-Blocker behandelt; die Implementierung löst die
+Threads nicht selbst. Die alten allein projektgebundenen Store-Verträge und der
+Transport-PASS aufgrund des Python-Typs sind entfernt.
+
+`CredentialIdentity` ist unveränderlich und enthält ausschließlich nicht geheime
+Projekt-, Credential-, Service-Account- und Handlereferenzen, den vollständigen
+Canary-Bindungsdigest sowie ursprüngliche Provisionierungs-/Ablaufzeiten. Identitäten
+sind höchstens 300 Sekunden gültig; fehlende, zusätzliche, fremde, zukünftige oder
+veraltete Identitäten sperren. Die frische Account-, Scope- und Store-Evidence muss
+exakt denselben Identitätsdigest bestätigen. Der Transport pinnt die tatsächliche
+Store-Identität bei Konstruktion; Controller, Handleprobe und Wire prüfen sie erneut.
+Ein nachträglicher Austausch von Store oder Identität führt zu NO-GO.
+
+`FDSecretStore` bindet die unveränderliche Identität an genau einen extern geöffneten
+Deskriptor. Geräte-/Inode-/Größen-/Änderungsmetadaten werden bei Provisionierung fixiert
+und vor sowie nach dem begrenzten Credentiallesen geprüft. Dateiaustausch, Änderung
+oder Umbelegung des Deskriptors erfordert einen neuen extern provisionierten Handle
+und neue Evidence; keine automatische Rotation. Es wird kein Secret-Fingerprint
+veröffentlicht. Der externe Provisionierer muss die tatsächliche Key-/Principal-
+Zuordnung korrekt ermitteln; beliebiger Pythoncode mit gefälschten Metadaten ist
+keine unabhängige Vertrauensquelle. Tests verwenden nur synthetische Keymarker.
+
 ## Sanitierte Accountprüfung
 
 `ReadOnlyVerifier.inspect(binding, now)` prüft jedes Gate getrennt. `Observation`
@@ -50,16 +74,32 @@ Bindungen sperren ohne Echo der Eingangswerte.
 | Gate | Erforderliche normalisierte Fakten |
 | --- | --- |
 | provider_contract_current | offizieller Ursprung, DT-016-Vertrag, kostenwirksames Create und verzögerte Spend-Durchsetzung ausdrücklich bestätigt |
-| account_project_binding | exaktes Projekt und Credentialprojekt, Service-Account- und Credentialreferenz |
-| credential_scope | Key-, Principal- und effektive Rechte jeweils exakt minimale DT-016-Capabilities, keine zusätzlichen Rechte |
+| account_project_binding | exaktes Projekt und Credentialprojekt, Service-Account-, Credential- und Handlereferenz sowie Identitätsdigest |
+| credential_scope | Key-, Principal- und effektive Rechte jeweils exakt minimale DT-016-Capabilities, keine zusätzlichen Rechte; gleicher Credential-Identitätsdigest |
 | spend_controls | aktuell beobachtetes Projektlimit gleich dem gebundenen Budget; verzögerte Durchsetzung bestätigt |
-| secret_store | externer lesbarer Store, Ausschluss aus Chat/Git/Prompts/Logs; zusätzlich reale lesende Probe des injizierten Handles ohne Socket |
+| secret_store | externer lesbarer Store, Ausschluss aus Chat/Git/Prompts/Logs; gleicher Credential-Identitätsdigest und zusätzlich lesende Probe des injizierten Handles ohne Socket |
 | agent_configuration | Agent-ID, verfügbares und zugelassenes Modell, Digest der vollständig gepinnten Konfiguration |
 | environment_configuration | Digest, network=disabled, container_size=small |
 | single_canary_grant | exakte Bindung/Budget, ein Create/eine Nachricht, externe exklusive Eigentümerschaft, Grantreferenz und ursprünglicher Grantzeitraum (höchstens 3.600 Sekunden) |
 
-`real_transport` bewertet das Vorhandensein des implementierten festen Transports;
-**PASS bedeutet hier keine erfolgreiche echte Providerkommunikation**.
+`transport_implementation` bewertet ausschließlich die lokale technische Verfügbarkeit.
+Daraus entsteht **keine** `real_transport`-Attestation. Ohne unabhängigen frischen
+Read-only-Transportnachweis gilt `real_transport=MISSING_OR_INVALID` und `LIVE=NO-GO`.
+Der Nachweis muss als eigene `Observation` mit Quelle `controlled_transport_readonly`
+vorliegen: exakt `https://api.openai.com`, Projekt, Credential-/Service-Account-/Handle-
+Referenz und vollständiger Identitätsdigest, Route-Digest, geprüfte TLS-/Hostname-Regeln,
+gesperrte Redirects, `read_only=true`, `probe_method=GET`, Bindungsdigest und frischer
+Beobachtungs-/Ablaufzeitraum (höchstens 300 Sekunden). Zusatzfelder und abweichende
+Werte sperren. Die Quellenklasse allein ersetzt keine unabhängig kontrollierte Erhebung.
+
+Der Route-Digest bindet die im Transport gepinnte Proxyroute, Wire-Instanz, TLS-/Origin-
+Regeln und Phasentimeouts. Ein anderer Wire-Handle, eine andere Konfiguration oder ein
+Controller-Neustart benötigt einen neuen Nachweis. Änderungen an der Proxyumgebung
+ändern den bereits gepinnten Transportweg nicht. Der externe Prüfer kann den exakt
+vorgesehenen Transport mit einem bestehenden festen DT-016-Session-GET/List-GET prüfen;
+kein Session-Create und kein anderer mutierender Aufruf ist dafür nötig. Der Controller
+stellt keine eigene Attestation aus und startet keine automatische Providerprobe.
+
 `durable_journal` verlangt einen vorhandenen gebundenen Dateidatenbank-Slot,
 SQLite `synchronous=FULL` und Journalmodus DELETE oder WAL. In-Memory, fehlende,
 ausgetauschte oder beschädigte Slots sperren. Die Verbindung muss für den

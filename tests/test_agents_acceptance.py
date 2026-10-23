@@ -9,7 +9,12 @@ from unittest.mock import patch
 
 from developer_team.adapters.agents_api_contracts import AgentsAPIError
 from developer_team.agents_acceptance import ACCOUNT_CHECKS, AcceptanceController, ReadOnlyVerifier
-from tests.acceptance_support import SYNTHETIC_SECRET, AcceptanceHarness, Collector
+from tests.acceptance_support import (
+    SYNTHETIC_SECRET,
+    AcceptanceHarness,
+    Collector,
+    bind_synthetic_route,
+)
 from tests.agents_api_support import NOW, binding
 
 
@@ -233,6 +238,7 @@ class AcceptanceTests(unittest.TestCase):
             return conn
 
         self.h.controller._transport._factory = revoked
+        bind_synthetic_route(self.h.collector, self.h.controller)
         with self.assertRaises(AgentsAPIError):
             self.h.controller.execute("create_session")
         self.assertEqual(self.h.count_posts(), 0)

@@ -220,3 +220,12 @@ ohne echte Credentials oder Provider-POST geprüft. [Vertrag und Live-Blocker](d
 
 **real_submissions = 0 · LIVE = NO-GO.**
 **OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
+
+
+Die PR-35-Reviewregressionen in `tests/test_agents_acceptance_review.py` prüfen die
+unveränderliche Credential-/Principal-/Handlebindung, fehlende/zusätzliche/veraltete
+Identitäten, tatsächlichen FD-Austausch, Identitätsablauf während der Probe sowie die
+unabhängige frische Read-only-Transport-Attestation einschließlich Origin, Projekt,
+Credentialidentität, TLS-Regeln, Route und Widerruf direkt am Wire. Alle Attestierungen
+und Transportproben sind synthetisch; kein echter OpenAI-Aufruf. Ein verfügbarer
+Transport ohne diese Evidence meldet `real_transport=MISSING_OR_INVALID` und NO-GO.

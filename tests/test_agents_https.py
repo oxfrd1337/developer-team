@@ -13,8 +13,13 @@ from unittest.mock import Mock, patch
 
 from developer_team.adapters.agents_api_contracts import AgentsAPIError, WireRequest, WireResponse
 from developer_team.adapters.agents_https import FDSecretStore, HardenedHTTPS
-from tests.acceptance_support import SYNTHETIC_SECRET, SyntheticStore, WireConnection
-from tests.agents_api_support import FixtureTransport, binding
+from tests.acceptance_support import (
+    SYNTHETIC_SECRET,
+    SyntheticStore,
+    WireConnection,
+    credential_identity,
+)
+from tests.agents_api_support import NOW, FixtureTransport, binding
 
 
 class HTTPSTests(unittest.TestCase):
@@ -25,7 +30,8 @@ class HTTPSTests(unittest.TestCase):
         self.factory = Mock(return_value=self.conn)
         self.gate = Mock()
         self.transport = HardenedHTTPS(
-            self.bound, SyntheticStore(), mutation_gate=self.gate, connection_factory=self.factory
+            self.bound, SyntheticStore(), mutation_gate=self.gate, connection_factory=self.factory,
+            now=lambda: NOW,
         )
 
     def request(self, **changes):
@@ -107,8 +113,11 @@ class HTTPSTests(unittest.TestCase):
 
     def test_store_errors_are_sanitized_before_connection(self):
         store = Mock()
+        store.identity = credential_identity()
         store.with_authorization.side_effect = PermissionError(SYNTHETIC_SECRET)
-        transport = HardenedHTTPS(self.bound, store, connection_factory=self.factory)
+        transport = HardenedHTTPS(
+            self.bound, store, connection_factory=self.factory, now=lambda: NOW
+        )
         with self.assertRaises(AgentsAPIError) as caught:
             transport.exchange(self.request())
         self.assertNotIn(SYNTHETIC_SECRET, str(caught.exception))
@@ -238,9 +247,9 @@ class HTTPSTests(unittest.TestCase):
             os.fchmod(stream.fileno(), 0o600)
             stream.write(SYNTHETIC_SECRET.encode())
             stream.flush()
-            store = FDSecretStore(stream.fileno(), self.bound.project_id)
+            store = FDSecretStore(stream.fileno(), credential_identity())
             result = store.with_authorization(
-                self.bound.project_id, lambda value: WireResponse(204)
+                credential_identity(), lambda value: WireResponse(204)
             )
             self.assertEqual(result, WireResponse(204))
             self.assertNotIn(SYNTHETIC_SECRET, repr(store))
@@ -249,11 +258,11 @@ class HTTPSTests(unittest.TestCase):
                     store.with_authorization(project, lambda value: WireResponse(204))
             os.fchmod(stream.fileno(), 0o644)
             with self.assertRaises(AgentsAPIError):
-                store.with_authorization(self.bound.project_id, lambda value: WireResponse(204))
+                store.with_authorization(credential_identity(), lambda value: WireResponse(204))
 
     def test_fd_store_missing_unreadable_or_invalid_material_blocks_before_send(self):
         with tempfile.TemporaryFile() as stream:
-            store = FDSecretStore(stream.fileno(), self.bound.project_id)
+            store = FDSecretStore(stream.fileno(), credential_identity())
             send = Mock(return_value=WireResponse(204))
             for data in (b"", b"x" * 513, b"Bearer secret", b"secret\r\nheader", b"\xff"):
                 stream.seek(0)
@@ -261,10 +270,10 @@ class HTTPSTests(unittest.TestCase):
                 stream.write(data)
                 stream.flush()
                 with self.assertRaises(AgentsAPIError):
-                    store.with_authorization(self.bound.project_id, send)
+                    store.with_authorization(credential_identity(), send)
             send.assert_not_called()
         with self.assertRaises(AgentsAPIError):
-            store.with_authorization(self.bound.project_id, send)
+            store.with_authorization(credential_identity(), send)
         for descriptor in (-1, None, True):
             with self.assertRaises(AgentsAPIError):
                 FDSecretStore(descriptor, self.bound.project_id)

@@ -3,20 +3,30 @@
 import io
 import json
 import sqlite3
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from unittest.mock import Mock
 
 from developer_team.adapters.agents_api_contracts import MINIMAL_CAPABILITIES, WireRequest, sha256
+from developer_team.adapters.agents_credentials import CredentialIdentity
 from developer_team.agents_acceptance import AcceptanceController, Observation, OperatorApproval
 from tests.agents_api_support import NOW, FixtureTransport, binding
 
 SYNTHETIC_SECRET = "synthetic-wire-marker-never-a-real-key"  # noqa: S105 - test marker
 
 
+def credential_identity(**changes):
+    return replace(CredentialIdentity(
+        "proj_synthetic", "key_synthetic", "sa_synthetic", "handle_synthetic",
+        binding().digest, NOW, NOW + 300,
+    ), **changes)
+
+
 class Collector:
     def __init__(self, bound=None):
         b = bound or binding()
+        identity = credential_identity()
+        route = "a" * 64  # Synthetic attester binds the actual test wire after construction.
         facts = {
             "provider_contract_current": {
                 "contract": "dt016-agents-v1",
@@ -29,8 +39,11 @@ class Collector:
                 "credential_project_id": b.project_id,
                 "service_account_ref": "sa_synthetic",
                 "credential_ref": "key_synthetic",
+                "handle_ref": identity.handle_ref,
+                "credential_identity_digest": identity.digest,
             },
             "credential_scope": {
+                "credential_identity_digest": identity.digest,
                 "key_capabilities": sorted(MINIMAL_CAPABILITIES),
                 "principal_capabilities": sorted(MINIMAL_CAPABILITIES),
                 "effective_capabilities": sorted(MINIMAL_CAPABILITIES),
@@ -38,6 +51,7 @@ class Collector:
             },
             "spend_controls": {"project_limit_cents": b.budget_cents, "enforcement_delayed": True},
             "secret_store": {
+                "credential_identity_digest": identity.digest,
                 "external": True,
                 "readable": True,
                 "excluded_from_chat_git_prompts_logs": True,
@@ -53,6 +67,15 @@ class Collector:
                 "configuration_digest": sha256(b.environment_configuration),
                 "network": "disabled",
                 "container_size": "small",
+            },
+            "real_transport": {
+                "origin": "https://api.openai.com", "project_id": b.project_id,
+                "credential_identity_digest": identity.digest,
+                "credential_ref": identity.credential_ref,
+                "service_account_ref": identity.service_account_ref,
+                "handle_ref": identity.handle_ref, "route_digest": route,
+                "tls_verified": True, "hostname_verified": True,
+                "redirects_blocked": True, "read_only": True, "probe_method": "GET",
             },
             "single_canary_grant": {
                 "binding_digest": b.digest,
@@ -73,7 +96,8 @@ class Collector:
                 NOW + 300,
                 "official_documentation"
                 if name == "provider_contract_current"
-                else "controlled_account_readonly",
+                else ("controlled_transport_readonly" if name == "real_transport"
+                      else "controlled_account_readonly"),
                 "verifier_synthetic",
                 value,
             )
@@ -104,8 +128,14 @@ class Broker:
         return review
 
 
+@dataclass(frozen=True, slots=True)
 class SyntheticStore:
-    def with_authorization(self, project, send):
+    identity: CredentialIdentity = field(default_factory=credential_identity)
+
+    def with_authorization(self, identity, send):
+        if type(identity) is not CredentialIdentity or identity != self.identity:
+            from developer_team.adapters.agents_api_contracts import AgentsAPIError
+            raise AgentsAPIError("synthetic_identity_mismatch")
         return send("Bearer " + SYNTHETIC_SECRET)
 
 
@@ -165,7 +195,7 @@ class AcceptanceHarness:
         return conn
 
     def restart(self):
-        return AcceptanceController(
+        controller = AcceptanceController(
             self.bound,
             self.connection,
             collector=self.collector,
@@ -174,6 +204,9 @@ class AcceptanceHarness:
             connection_factory=self.factory,
             now=lambda: self.clock,
         )
+        bind_synthetic_route(self.collector, controller)
+        return controller
+
 
     def create(self):
         self.broker.confirm(self.controller, "create_session")
@@ -191,3 +224,12 @@ class AcceptanceHarness:
 
     def report_json(self):
         return json.dumps(self.controller.report())
+
+
+def bind_synthetic_route(collector, controller):
+    """Fixture-only attestation; never a production verifier or real API probe."""
+    old = collector.observations.get("real_transport")
+    if old is not None:
+        collector.observations["real_transport"] = replace(
+            old, facts={**old.facts, "route_digest": controller._transport.route_digest}
+        )

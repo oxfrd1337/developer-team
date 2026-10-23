@@ -13,6 +13,8 @@ import stat
 import threading
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
+from functools import partial
 from urllib.parse import urlsplit
 from urllib.request import getproxies
 
@@ -25,8 +27,10 @@ from .agents_api_contracts import (
     WireRequest,
     WireResponse,
     canonical,
-    safe_ref,
+    sha256,
 )
+
+from .agents_credentials import CredentialIdentity, require_identity
 
 
 class _HeaderReader:
@@ -60,6 +64,7 @@ class BoundedHTTPResponse(http.client.HTTPResponse):
             self.fp = stream
 
 
+@dataclass(frozen=True, slots=True, repr=False)
 class FDSecretStore:
     """External store supplies an already opened private, regular-file descriptor.
 
@@ -68,17 +73,39 @@ class FDSecretStore:
     bounded read occurs per exchange, before any socket is opened.
     """
 
-    def __init__(self, descriptor: int, project_id: str):
-        if type(descriptor) is not int or descriptor < 0 or not safe_ref(project_id):
-            raise AgentsAPIError("external_secret_store_required")
-        self._descriptor, self._project = descriptor, project_id
+    _descriptor: int
+    identity: CredentialIdentity
+    _snapshot: tuple
 
-    def with_authorization(self, project_id: str, send: Callable) -> WireResponse:
+    def __init__(self, descriptor: int, identity: CredentialIdentity):
+        if (
+            type(descriptor) is not int or descriptor < 0
+            or type(identity) is not CredentialIdentity
+        ):
+            raise AgentsAPIError("external_secret_store_required")
+        snapshot = None
+        try:
+            snapshot = self._file_identity(os.fstat(descriptor))
+        except OSError:
+            snapshot = None
+        if snapshot is None:
+            raise AgentsAPIError("external_secret_store_required")
+        object.__setattr__(self, "_descriptor", descriptor)
+        object.__setattr__(self, "identity", identity)
+        object.__setattr__(self, "_snapshot", snapshot)
+
+    @staticmethod
+    def _file_identity(info):
+        return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+    def with_authorization(self, identity: CredentialIdentity, send: Callable) -> WireResponse:
         result = None
         try:
             info = os.fstat(self._descriptor)
             if (
-                project_id != self._project
+                type(identity) is not CredentialIdentity
+                or identity != self.identity
+                or self._file_identity(info) != self._snapshot
                 or not stat.S_ISREG(info.st_mode)
                 or info.st_mode & 0o077
                 or info.st_uid != os.geteuid()
@@ -86,7 +113,8 @@ class FDSecretStore:
             ):
                 raise ValueError
             secret = os.pread(self._descriptor, 513, 0)
-            if re.fullmatch(rb"[A-Za-z0-9_-]{1,512}", secret) is None:
+            if (self._file_identity(os.fstat(self._descriptor)) != self._snapshot
+                    or re.fullmatch(rb"[A-Za-z0-9_-]{1,512}", secret) is None):
                 raise ValueError
             result = send("Bearer " + secret.decode("ascii"))
         except Exception:
@@ -113,20 +141,30 @@ class HardenedHTTPS:
         monotonic=time.monotonic,
         connect_timeout=2.0,
         read_timeout=2.0,
+        now=time.time,
     ):
         binding.validate()
         for value in (connect_timeout, read_timeout):
             if type(value) not in {int, float} or not math.isfinite(value) or not 0 < value <= 5:
                 raise AgentsAPIError("invalid_transport_timeout")
         self._binding, self._store, self._gate = binding, secret_store, mutation_gate
-        self._factory = connection_factory or self._connection
+        identity = None
+        try:
+            identity = secret_store.identity
+        except Exception:
+            identity = None
+        self._identity = identity
+        self._proxy = getproxies().get("https")
+        self._factory = connection_factory or partial(self._connection, proxy=self._proxy)
+        self._wire_kind = "injected-wire" if connection_factory else "stdlib-https"
+        self._now = now
         self._clock = monotonic
         self._connect_timeout, self._read_timeout = connect_timeout, read_timeout
 
     @staticmethod
-    def _connection(timeout):
+    def _connection(timeout, *, proxy=...):
         # Preserve configured proxy routing and system/SSL_CERT_FILE CA trust.
-        proxy = getproxies().get("https")
+        proxy = getproxies().get("https") if proxy is ... else proxy
         context = ssl.create_default_context()
         if proxy:
             parsed = urlsplit(proxy)
@@ -146,6 +184,25 @@ class HardenedHTTPS:
             conn.set_tunnel("api.openai.com", 443)
             return conn
         return http.client.HTTPSConnection("api.openai.com", 443, timeout=timeout, context=context)
+
+    @property
+    def credential_identity(self):
+        return self._identity
+
+    @property
+    def route_digest(self):
+        return sha256({
+            "origin": PROVIDER_BASE, "proxy": self._proxy, "wire_kind": self._wire_kind,
+            "wire_handle": id(self._factory),
+            "tls": "verified-hostname-system-ca", "redirects": False, "mutation_retries": 0,
+            "connect_timeout": self._connect_timeout, "read_timeout": self._read_timeout,
+        })
+
+    def _validate_identity(self):
+        identity = require_identity(self._identity, self._binding, int(self._now()))
+        if self._store.identity != identity:
+            raise AgentsAPIError("credential_handle_changed")
+        return identity
 
     def _validate(self, request):
         if type(request) is not WireRequest:
@@ -225,8 +282,9 @@ class HardenedHTTPS:
             raise AgentsAPIError("fresh_operator_approval_required")
         result = None
         try:
+            identity = self._validate_identity()
             result = self._store.with_authorization(
-                self._binding.project_id,
+                identity,
                 lambda authorization: self._bounded(request, path, operation, authorization),
             )
         except Exception:
@@ -281,6 +339,7 @@ class HardenedHTTPS:
                     self._gate(self._binding, operation, path)
                 if stopped.is_set() or self._clock() >= request.deadline:
                     return
+                self._validate_identity()
                 headers = dict(request.headers)
                 headers["Authorization"] = authorization
                 headers["Accept-Encoding"] = "identity"

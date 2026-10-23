@@ -25,6 +25,7 @@ from .adapters.agents_api_contracts import (
     sha256,
 )
 from .adapters.agents_api_journal import SQLiteCanaryJournal
+from .adapters.agents_credentials import require_identity
 from .adapters.agents_https import HardenedHTTPS
 
 ACCOUNT_CHECKS = (
@@ -36,8 +37,9 @@ ACCOUNT_CHECKS = (
     "agent_configuration",
     "environment_configuration",
     "single_canary_grant",
+    "real_transport",
 )
-CHECKS = ACCOUNT_CHECKS[:-1] + ("real_transport", "durable_journal", ACCOUNT_CHECKS[-1])
+CHECKS = ACCOUNT_CHECKS + ("transport_implementation", "durable_journal")
 APPROVALS = {"create_session": "fresh_create_approval", "submit_canary": "fresh_submit_approval"}
 
 
@@ -52,7 +54,7 @@ class Observation:
     facts: dict
 
 
-def _facts_match(check, facts, b, now):
+def _facts_match(check, facts, b, now, identity, route_digest):
     """Strict normalized schemas; never copy input values into diagnostics."""
     if type(facts) is not dict:
         return False
@@ -91,6 +93,16 @@ def _facts_match(check, facts, b, now):
             "network": "disabled",
             "container_size": "small",
         },
+        "real_transport": {
+            "origin": "https://api.openai.com", "project_id": b.project_id,
+            "credential_identity_digest": identity.digest if identity else None,
+            "credential_ref": identity.credential_ref if identity else None,
+            "service_account_ref": identity.service_account_ref if identity else None,
+            "handle_ref": identity.handle_ref if identity else None,
+            "route_digest": route_digest,
+            "tls_verified": True, "hostname_verified": True,
+            "redirects_blocked": True, "read_only": True, "probe_method": "GET",
+        },
         "single_canary_grant": {
             "binding_digest": b.digest,
             "budget_cents": b.budget_cents,
@@ -99,11 +111,17 @@ def _facts_match(check, facts, b, now):
             "exclusive_external_ownership": True,
         },
     }[check]
+    if check in {"account_project_binding", "credential_scope", "secret_store", "real_transport"}:
+        if identity is None:
+            return False
+        expected["credential_identity_digest"] = identity.digest
     if check == "account_project_binding":
-        for key in ("service_account_ref", "credential_ref"):
-            if not safe_ref(facts.get(key)):
-                return False
-            expected[key] = facts[key]
+        expected.update({
+            "service_account_ref": identity.service_account_ref,
+            "credential_ref": identity.credential_ref, "handle_ref": identity.handle_ref,
+        })
+    if check == "real_transport" and (type(route_digest) is not str or len(route_digest) != 64):
+        return False
     if check == "single_canary_grant":
         if not safe_ref(facts.get("grant_ref")):
             return False
@@ -128,9 +146,13 @@ class ReadOnlyVerifier:
     def __init__(self, collector=None):
         self._collector = collector
 
-    def inspect(self, binding, now):
+    def inspect(self, binding, now, identity=None, route_digest=None):
         binding.validate()
         checks, observations = {}, {}
+        try:
+            identity = require_identity(identity, binding, now)
+        except AgentsAPIError:
+            identity = None
         for check in ACCOUNT_CHECKS:
             observation = None
             try:
@@ -144,12 +166,13 @@ class ReadOnlyVerifier:
                     == (
                         "official_documentation"
                         if check == "provider_contract_current"
-                        else "controlled_account_readonly"
+                        else ("controlled_transport_readonly" if check == "real_transport"
+                              else "controlled_account_readonly")
                     )
                     and bounded_int(now, 0, 2**53)
                     and bounded_int(observation.observed_at, max(0, now - 300), now)
                     and bounded_int(observation.expires_at, now + 1, observation.observed_at + 300)
-                    and _facts_match(check, observation.facts, binding, now)
+                    and _facts_match(check, observation.facts, binding, now, identity, route_digest)
                 )
             except Exception:
                 valid = False
@@ -202,6 +225,7 @@ class AcceptanceController:
             secret_store,
             mutation_gate=self._wire_gate,
             connection_factory=connection_factory,
+            now=now,
         )
         self._adapter = AgentsAPIAdapter(
             binding,
@@ -263,23 +287,50 @@ class AcceptanceController:
 
     def _inspect(self):
         now = int(self._now())
-        checks, observations = self._verifier.inspect(self._binding, now)
-        # Recheck freshness after a slow collector, never against its start time.
+        identity, route_digest = None, None
+        try:
+            identity = require_identity(self._transport.credential_identity, self._binding, now)
+            if self._secret_store is not self._transport._store:
+                raise AgentsAPIError("credential_handle_changed")
+            if self._secret_store.identity != identity:
+                raise AgentsAPIError("credential_handle_changed")
+            route_digest = self._transport.route_digest
+        except Exception:
+            identity = None
+        checks, observations = self._verifier.inspect(
+            self._binding, now, identity, route_digest
+        )
+        secret_ready = False
+        try:
+            if identity is not None:
+                secret_ready = self._secret_store.with_authorization(
+                    identity, lambda _: WireResponse(204)
+                ) == WireResponse(204)
+        except Exception:
+            secret_ready = False
         after = int(self._now())
+        # Recheck all leases after the collector AND actual handle probe returned.
+        try:
+            require_identity(identity, self._binding, after)
+            if (self._secret_store.identity != identity
+                    or self._transport.route_digest != route_digest):
+                raise AgentsAPIError("credential_or_route_changed")
+        except Exception:
+            identity, secret_ready = None, False
         for check, observation in observations.items():
             if after >= observation.expires_at or after - observation.observed_at > 300:
                 checks[check] = "MISSING_OR_INVALID"
-        # Validate the actual external handle without returning its header or opening a socket.
-        secret_ready = False
-        try:
-            secret_ready = self._secret_store.with_authorization(
-                self._binding.project_id, lambda _: WireResponse(204)
-            ) == WireResponse(204)
-        except Exception:
-            secret_ready = False
+        if identity is None:
+            for check in (
+                "account_project_binding", "credential_scope", "secret_store", "real_transport"
+            ):
+                checks[check] = "MISSING_OR_INVALID"
         if not secret_ready:
             checks["secret_store"] = "MISSING_OR_INVALID"  # noqa: S105 - gate status, no secret
-        checks["real_transport"] = "PASS" if type(self._transport) is HardenedHTTPS else "MISSING"
+            checks["real_transport"] = "MISSING_OR_INVALID"
+        checks["transport_implementation"] = (
+            "PASS" if type(self._transport) is HardenedHTTPS else "MISSING_OR_INVALID"
+        )
         checks["durable_journal"] = "PASS" if self._durable() else "MISSING"
         return checks, observations, after
 
