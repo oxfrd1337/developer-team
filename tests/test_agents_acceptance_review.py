@@ -33,8 +33,12 @@ class AcceptanceReviewTests(unittest.TestCase):
 
     def use_store(self, store):
         self.h.controller = AcceptanceController(
-            self.h.bound, self.h.connection, collector=self.h.collector, secret_store=store,
-            operator_broker=self.h.broker, connection_factory=self.h.factory,
+            self.h.bound,
+            self.h.connection,
+            collector=self.h.collector,
+            secret_store=store,
+            operator_broker=self.h.broker,
+            connection_factory=self.h.factory,
             now=lambda: self.h.clock,
         )
         bind_synthetic_route(self.h.collector, self.h.controller)
@@ -59,7 +63,8 @@ class AcceptanceReviewTests(unittest.TestCase):
 
     def test_wrong_project_handle_or_binding_blocks(self):
         for changes in (
-            {"project_id": "proj_other"}, {"handle_ref": "handle_other"},
+            {"project_id": "proj_other"},
+            {"handle_ref": "handle_other"},
             {"binding_digest": "b" * 64},
         ):
             with self.subTest(changes=changes):
@@ -69,6 +74,7 @@ class AcceptanceReviewTests(unittest.TestCase):
     def test_identity_missing_dict_with_extra_fields_or_subclass_is_rejected(self):
         class ExtendedIdentity(CredentialIdentity):
             extra = "unexpected"
+
         extra = {**asdict(credential_identity()), "extra": SYNTHETIC_SECRET}
         for identity in (None, extra, ExtendedIdentity(**asdict(credential_identity()))):
             self.use_store(SyntheticStore(identity))
@@ -76,8 +82,11 @@ class AcceptanceReviewTests(unittest.TestCase):
 
     def test_old_future_expired_or_overlong_handle_identity_blocks(self):
         for changes in (
-            {"issued_at": NOW - 301}, {"issued_at": NOW + 1}, {"issued_at": True},
-            {"expires_at": NOW}, {"expires_at": NOW + 301},
+            {"issued_at": NOW - 301},
+            {"issued_at": NOW + 1},
+            {"issued_at": True},
+            {"expires_at": NOW},
+            {"expires_at": NOW + 301},
         ):
             self.use_store(SyntheticStore(credential_identity(**changes)))
             self.assert_blocked_before_network("account_project_binding")
@@ -137,11 +146,14 @@ class AcceptanceReviewTests(unittest.TestCase):
 
     def test_identity_expires_during_probe_and_blocks_gate(self):
         controller = self.h.controller
+
         class SlowStore:
             identity = credential_identity()
+
             def with_authorization(inner, identity, send):
                 self.h.clock = NOW + 301
                 return send("Bearer " + SYNTHETIC_SECRET)
+
         self.use_store(SlowStore())
         self.assert_blocked_before_network("account_project_binding")
         self.h.controller = controller
@@ -173,10 +185,14 @@ class AcceptanceReviewTests(unittest.TestCase):
 
     def test_transport_attestation_wrong_origin_project_key_principal_or_route_blocks(self):
         for changes in (
-            {"origin": "https://other.example"}, {"origin": "http://api.openai.com"},
-            {"project_id": "proj_other"}, {"credential_ref": "key_other"},
-            {"service_account_ref": "sa_other"}, {"handle_ref": "handle_other"},
-            {"credential_identity_digest": "b" * 64}, {"route_digest": "b" * 64},
+            {"origin": "https://other.example"},
+            {"origin": "http://api.openai.com"},
+            {"project_id": "proj_other"},
+            {"credential_ref": "key_other"},
+            {"service_account_ref": "sa_other"},
+            {"handle_ref": "handle_other"},
+            {"credential_identity_digest": "b" * 64},
+            {"route_digest": "b" * 64},
         ):
             check = "real_transport"
             original = self.h.collector.observations[check]
@@ -187,8 +203,12 @@ class AcceptanceReviewTests(unittest.TestCase):
     def test_transport_attestation_tls_redirect_mutation_or_extra_claim_blocks(self):
         check = "real_transport"
         for changes in (
-            {"tls_verified": False}, {"hostname_verified": False}, {"redirects_blocked": False},
-            {"read_only": False}, {"probe_method": "POST"}, {"tls_verified": 1},
+            {"tls_verified": False},
+            {"hostname_verified": False},
+            {"redirects_blocked": False},
+            {"read_only": False},
+            {"probe_method": "POST"},
+            {"tls_verified": 1},
             {"response_text": SYNTHETIC_SECRET},
         ):
             original = self.h.collector.observations[check]
@@ -200,9 +220,13 @@ class AcceptanceReviewTests(unittest.TestCase):
         check = "real_transport"
         original = self.h.collector.observations[check]
         for changes in (
-            {"observed_at": NOW - 301}, {"expires_at": NOW}, {"observed_at": NOW + 1},
-            {"source": "controlled_account_readonly"}, {"source": "local_implementation"},
-            {"binding_digest": "b" * 64}, {"expires_at": NOW + 301},
+            {"observed_at": NOW - 301},
+            {"expires_at": NOW},
+            {"observed_at": NOW + 1},
+            {"source": "controlled_account_readonly"},
+            {"source": "local_implementation"},
+            {"binding_digest": "b" * 64},
+            {"expires_at": NOW + 301},
         ):
             self.h.collector.observations[check] = replace(original, **changes)
             self.assert_blocked_before_network(check)
@@ -215,12 +239,16 @@ class AcceptanceReviewTests(unittest.TestCase):
     def test_revoked_transport_attestation_at_wire_blocks_first_post(self):
         self.h.broker.confirm(self.h.controller, "create_session")
         original = self.h.factory
+
         def make_connection(timeout):
             connection = original(timeout)
+
             def revoke():
                 del self.h.collector.observations["real_transport"]
+
             connection.connect = revoke
             return connection
+
         self.h.controller._transport._factory = make_connection
         bind_synthetic_route(self.h.collector, self.h.controller)
         with self.assertRaises(AgentsAPIError):
@@ -243,19 +271,20 @@ class AcceptanceReviewTests(unittest.TestCase):
             self.assertNotIn("Authorization", rendered)
         self.assertEqual(self.h.connections, [])
 
-
     def test_fd_change_during_secret_read_is_detected_before_header_injection(self):
         with tempfile.TemporaryFile() as stream:
             stream.write(SYNTHETIC_SECRET.encode())
             stream.flush()
             store = FDSecretStore(stream.fileno(), credential_identity())
             original = os.pread
+
             def changed(descriptor, size, offset):
                 data = original(descriptor, size, offset)
                 stream.seek(0)
                 stream.write(b"different-synthetic-key-material")
                 stream.flush()
                 return data
+
             send = Mock(return_value=WireResponse(204))
             with patch("os.pread", side_effect=changed), self.assertRaises(AgentsAPIError):
                 store.with_authorization(credential_identity(), send)

@@ -16,10 +16,18 @@ SYNTHETIC_SECRET = "synthetic-wire-marker-never-a-real-key"  # noqa: S105 - test
 
 
 def credential_identity(**changes):
-    return replace(CredentialIdentity(
-        "proj_synthetic", "key_synthetic", "sa_synthetic", "handle_synthetic",
-        binding().digest, NOW, NOW + 300,
-    ), **changes)
+    return replace(
+        CredentialIdentity(
+            "proj_synthetic",
+            "key_synthetic",
+            "sa_synthetic",
+            "handle_synthetic",
+            binding().digest,
+            NOW,
+            NOW + 300,
+        ),
+        **changes,
+    )
 
 
 class Collector:
@@ -69,13 +77,18 @@ class Collector:
                 "container_size": "small",
             },
             "real_transport": {
-                "origin": "https://api.openai.com", "project_id": b.project_id,
+                "origin": "https://api.openai.com",
+                "project_id": b.project_id,
                 "credential_identity_digest": identity.digest,
                 "credential_ref": identity.credential_ref,
                 "service_account_ref": identity.service_account_ref,
-                "handle_ref": identity.handle_ref, "route_digest": route,
-                "tls_verified": True, "hostname_verified": True,
-                "redirects_blocked": True, "read_only": True, "probe_method": "GET",
+                "handle_ref": identity.handle_ref,
+                "route_digest": route,
+                "tls_verified": True,
+                "hostname_verified": True,
+                "redirects_blocked": True,
+                "read_only": True,
+                "probe_method": "GET",
             },
             "single_canary_grant": {
                 "binding_digest": b.digest,
@@ -96,8 +109,11 @@ class Collector:
                 NOW + 300,
                 "official_documentation"
                 if name == "provider_contract_current"
-                else ("controlled_transport_readonly" if name == "real_transport"
-                      else "controlled_account_readonly"),
+                else (
+                    "controlled_transport_readonly"
+                    if name == "real_transport"
+                    else "controlled_account_readonly"
+                ),
                 "verifier_synthetic",
                 value,
             )
@@ -135,6 +151,7 @@ class SyntheticStore:
     def with_authorization(self, identity, send):
         if type(identity) is not CredentialIdentity or identity != self.identity:
             from developer_team.adapters.agents_api_contracts import AgentsAPIError
+
             raise AgentsAPIError("synthetic_identity_mismatch")
         return send("Bearer " + SYNTHETIC_SECRET)
 
@@ -206,7 +223,6 @@ class AcceptanceHarness:
         )
         bind_synthetic_route(self.collector, controller)
         return controller
-
 
     def create(self):
         self.broker.confirm(self.controller, "create_session")

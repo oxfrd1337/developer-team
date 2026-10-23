@@ -109,7 +109,8 @@ Rollback-/Kopierschutz und globale Einmaligkeit bleiben externe Betreiberpflicht
 `prepare()` ist ausschließlich die einmalige explizite Provisionierung eines neuen
 Intents, niemals automatische Wiederherstellung verlorener Zustände.
 
-Der Report zeigt alle zehn Vorbedingungen einzeln und immer:
+Der Report zeigt alle Vorbedingungen und die lokale Transportverfügbarkeit einzeln;
+beide Freigaben bleiben im Report ausdrücklich fehlend:
 
 ```text
 fresh_create_approval = MISSING

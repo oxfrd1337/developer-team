@@ -20,9 +20,15 @@ class CredentialIdentity:
             self.project_id != binding.project_id
             or type(self.binding_digest) is not str
             or self.binding_digest != binding.digest
-            or not all(safe_ref(v) for v in (
-                self.project_id, self.credential_ref, self.service_account_ref, self.handle_ref
-            ))
+            or not all(
+                safe_ref(v)
+                for v in (
+                    self.project_id,
+                    self.credential_ref,
+                    self.service_account_ref,
+                    self.handle_ref,
+                )
+            )
             or not bounded_int(self.issued_at, max(0, now - 300), now)
             or not bounded_int(self.expires_at, now + 1, self.issued_at + 300)
         ):

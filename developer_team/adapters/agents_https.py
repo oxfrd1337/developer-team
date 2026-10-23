@@ -78,7 +78,8 @@ class FDSecretStore:
 
     def __init__(self, descriptor: int, identity: CredentialIdentity):
         if (
-            type(descriptor) is not int or descriptor < 0
+            type(descriptor) is not int
+            or descriptor < 0
             or type(identity) is not CredentialIdentity
         ):
             raise AgentsAPIError("external_secret_store_required")
@@ -112,8 +113,10 @@ class FDSecretStore:
             ):
                 raise ValueError
             secret = os.pread(self._descriptor, 513, 0)
-            if (self._file_identity(os.fstat(self._descriptor)) != self._snapshot
-                    or re.fullmatch(rb"[A-Za-z0-9_-]{1,512}", secret) is None):
+            if (
+                self._file_identity(os.fstat(self._descriptor)) != self._snapshot
+                or re.fullmatch(rb"[A-Za-z0-9_-]{1,512}", secret) is None
+            ):
                 raise ValueError
             result = send("Bearer " + secret.decode("ascii"))
         except Exception:
@@ -190,12 +193,19 @@ class HardenedHTTPS:
 
     @property
     def route_digest(self):
-        return sha256({
-            "origin": PROVIDER_BASE, "proxy": self._proxy, "wire_kind": self._wire_kind,
-            "wire_handle": id(self._factory),
-            "tls": "verified-hostname-system-ca", "redirects": False, "mutation_retries": 0,
-            "connect_timeout": self._connect_timeout, "read_timeout": self._read_timeout,
-        })
+        return sha256(
+            {
+                "origin": PROVIDER_BASE,
+                "proxy": self._proxy,
+                "wire_kind": self._wire_kind,
+                "wire_handle": id(self._factory),
+                "tls": "verified-hostname-system-ca",
+                "redirects": False,
+                "mutation_retries": 0,
+                "connect_timeout": self._connect_timeout,
+                "read_timeout": self._read_timeout,
+            }
+        )
 
     def _validate_identity(self):
         identity = require_identity(self._identity, self._binding, int(self._now()))

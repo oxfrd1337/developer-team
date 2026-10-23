@@ -30,7 +30,10 @@ class HTTPSTests(unittest.TestCase):
         self.factory = Mock(return_value=self.conn)
         self.gate = Mock()
         self.transport = HardenedHTTPS(
-            self.bound, SyntheticStore(), mutation_gate=self.gate, connection_factory=self.factory,
+            self.bound,
+            SyntheticStore(),
+            mutation_gate=self.gate,
+            connection_factory=self.factory,
             now=lambda: NOW,
         )
 

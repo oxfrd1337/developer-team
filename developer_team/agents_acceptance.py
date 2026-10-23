@@ -94,14 +94,18 @@ def _facts_match(check, facts, b, now, identity, route_digest):
             "container_size": "small",
         },
         "real_transport": {
-            "origin": "https://api.openai.com", "project_id": b.project_id,
+            "origin": "https://api.openai.com",
+            "project_id": b.project_id,
             "credential_identity_digest": identity.digest if identity else None,
             "credential_ref": identity.credential_ref if identity else None,
             "service_account_ref": identity.service_account_ref if identity else None,
             "handle_ref": identity.handle_ref if identity else None,
             "route_digest": route_digest,
-            "tls_verified": True, "hostname_verified": True,
-            "redirects_blocked": True, "read_only": True, "probe_method": "GET",
+            "tls_verified": True,
+            "hostname_verified": True,
+            "redirects_blocked": True,
+            "read_only": True,
+            "probe_method": "GET",
         },
         "single_canary_grant": {
             "binding_digest": b.digest,
@@ -116,10 +120,13 @@ def _facts_match(check, facts, b, now, identity, route_digest):
             return False
         expected["credential_identity_digest"] = identity.digest
     if check == "account_project_binding":
-        expected.update({
-            "service_account_ref": identity.service_account_ref,
-            "credential_ref": identity.credential_ref, "handle_ref": identity.handle_ref,
-        })
+        expected.update(
+            {
+                "service_account_ref": identity.service_account_ref,
+                "credential_ref": identity.credential_ref,
+                "handle_ref": identity.handle_ref,
+            }
+        )
     if check == "real_transport" and (type(route_digest) is not str or len(route_digest) != 64):
         return False
     if check == "single_canary_grant":
@@ -166,8 +173,11 @@ class ReadOnlyVerifier:
                     == (
                         "official_documentation"
                         if check == "provider_contract_current"
-                        else ("controlled_transport_readonly" if check == "real_transport"
-                              else "controlled_account_readonly")
+                        else (
+                            "controlled_transport_readonly"
+                            if check == "real_transport"
+                            else "controlled_account_readonly"
+                        )
                     )
                     and bounded_int(now, 0, 2**53)
                     and bounded_int(observation.observed_at, max(0, now - 300), now)
@@ -297,9 +307,7 @@ class AcceptanceController:
             route_digest = self._transport.route_digest
         except Exception:
             identity = None
-        checks, observations = self._verifier.inspect(
-            self._binding, now, identity, route_digest
-        )
+        checks, observations = self._verifier.inspect(self._binding, now, identity, route_digest)
         secret_ready = False
         try:
             if identity is not None:
@@ -312,8 +320,10 @@ class AcceptanceController:
         # Recheck all leases after the collector AND actual handle probe returned.
         try:
             require_identity(identity, self._binding, after)
-            if (self._secret_store.identity != identity
-                    or self._transport.route_digest != route_digest):
+            if (
+                self._secret_store.identity != identity
+                or self._transport.route_digest != route_digest
+            ):
                 raise AgentsAPIError("credential_or_route_changed")
         except Exception:
             identity, secret_ready = None, False
@@ -322,7 +332,10 @@ class AcceptanceController:
                 checks[check] = "MISSING_OR_INVALID"
         if identity is None:
             for check in (
-                "account_project_binding", "credential_scope", "secret_store", "real_transport"
+                "account_project_binding",
+                "credential_scope",
+                "secret_store",
+                "real_transport",
             ):
                 checks[check] = "MISSING_OR_INVALID"
         if not secret_ready:
