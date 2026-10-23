@@ -29,7 +29,6 @@ from .agents_api_contracts import (
     canonical,
     sha256,
 )
-
 from .agents_credentials import CredentialIdentity, require_identity
 
 
