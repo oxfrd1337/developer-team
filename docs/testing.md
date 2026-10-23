@@ -229,3 +229,32 @@ unabhängige frische Read-only-Transport-Attestation einschließlich Origin, Pro
 Credentialidentität, TLS-Regeln, Route und Widerruf direkt am Wire. Alle Attestierungen
 und Transportproben sind synthetisch; kein echter OpenAI-Aufruf. Ein verfügbarer
 Transport ohne diese Evidence meldet `real_transport=MISSING_OR_INVALID` und NO-GO.
+
+## DT-017A
+
+`python -m unittest tests.test_provider_readonly -v` prüft die GET-only-Grenze,
+getrennte Admin-/Canary-Identitäten, Account-/Owner-/Expiry-Bindung, reale
+Response-Schemas für Spend/Modelle/Agent, separat authentifizierte Scope-Evidence,
+Sanitisierung und Transportlimits. Ausschließlich synthetische HTTP-Fixtures;
+keine echten Provider-Credentials, keine echten OpenAI-Aufrufe in CI.
+Die bestehende Suite wird unverändert zusätzlich ausgeführt.
+[Vertrag, Negativmatrix und Live-Blocker](dt-017a-readonly-provider.md).
+**real_submissions = 0 · LIVE = NO-GO.**
+**OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
+
+
+DT-017A-Nachprüfung: Sechs zusätzliche Regressionen prüfen die Verkürzung der
+Account-Evidence auf Key-/Service-Account-/Owner-Ablauf, abgelaufene gecachte
+Observations, Ablauf während der abschließenden Handleprüfung sowie Canary-
+Handlewechsel vor oder während der externen Scope-Verifikation. Die separate
+Scope-Attestation gewährt weiterhin keine Transport- oder Live-Freigabe.
+
+
+DT-017A-Reviewblocker: `tests/test_scope_evidence.py` ergänzt 32 Regressionen für
+getrennte Key-/Principal-/effektive Typen und die Laufzeit-Trennung gepinnter
+Attestor-/Verifier-Identitäten. Die bisherigen Scope-Fixtures verwenden getrennte
+Source-/Verifier-Objekte. Namespace-Verwechslung, fehlende/zusätzliche/unbekannte
+Rechte, inkonsistente effektive Rechte, Self-Attestation, gleiche oder vertauschte
+Trust-Identitäten und Wechsel während externer Callbacks bleiben NO-GO. Der
+unabhängige korrekte synthetische Verifier erfüllt ausschließlich das Scope-Gate.
+Es erfolgen keine echten OpenAI-Aufrufe; real_submissions = 0, LIVE = NO-GO.
