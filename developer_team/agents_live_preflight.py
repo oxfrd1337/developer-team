@@ -13,7 +13,7 @@ import re
 
 MAX_PLAN_FIELDS = 19
 MAX_AMOUNT_CENTS = 1_000_000_000
-_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\\Z")
+_REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
 
 _EXPECTED_FIELDS = frozenset(
     {
