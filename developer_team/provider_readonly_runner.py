@@ -231,7 +231,7 @@ def main(argv=None):
             execute_real_readonly=args.execute_real_readonly,
         )
     except Exception:
-        pass
+        report = _report("PLAN", "BLOCKED")
     print(json.dumps(report, sort_keys=True, separators=(",", ":")))
     # Evidence collection is never a successful live authorization.
     return 2
