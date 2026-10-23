@@ -1,5 +1,11 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
+## DT-013: Offline-Preflight für einen späteren Agents-API-Canary
+
+[Fail-closed Betreiber-, Budget- und Scope-Prüfung ohne Provideraufruf](docs/dt-013-canary-preflight.md).
+Der Baustein bindet einen kurzen, synthetischen Read-only-Canary-Entscheid an Controller-SHA
+und Budgetgrenzen. **Keine API, keine Kosten, keine Secrets und keine Live-/Mergefreigabe.**
+
 ## DT-012 V0.1: synthetischer Agents-API-Canary-Replay
 
 [Reproduzierbarer Lebenszyklus-Prüfer ohne API-Aufrufe](docs/dt-012-canary-replay.md):
