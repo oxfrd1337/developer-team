@@ -1,5 +1,14 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
+## DT-016 V0.1: streng begrenzter Agents-API-Provideradapter
+
+[Adaptervertrag, Negativmatrix und Live-Blocker](docs/dt-016-agents-api-provider.md):
+Session-Erstellung und genau eine feste Canary-Nachricht sind getrennte Operationen.
+Ein exklusives Journal sperrt Wiederholungen nach unklaren Antworten; Reconciliation
+ist lesend, Cancel-Annahme und Turn-Terminalnachweis bleiben getrennt.
+**Standardmäßig deaktiviert, ausschließlich Wire-Fixtures getestet, real_submissions = 0,
+Live NO-GO. OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
+
 ## DT-012 V0.1: synthetischer Agents-API-Canary-Replay
 
 [Reproduzierbarer Lebenszyklus-Prüfer ohne API-Aufrufe](docs/dt-012-canary-replay.md):
