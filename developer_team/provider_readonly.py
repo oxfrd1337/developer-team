@@ -80,6 +80,7 @@ def _not_expired(record, now):
         _require(record["status"] == "active")
     if "owner_project_access" in record:
         _require(record["owner_project_access"] == "active")
+    return expiry if expiry is not None else now + 300
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -149,7 +150,11 @@ class AdminReadOnlyCollector:
         return self._transport._validate_identity()
 
     def account(self):
+        return self._account_evidence()[0]
+
+    def _account_evidence(self):
         self._validate()
+        expires_at = int(self._now()) + 300
         b, c = self._binding, self._identity
         root = f"/v1/organization/projects/{b.project_id}"
         project = _get(self._transport, root)
@@ -177,9 +182,10 @@ class AdminReadOnlyCollector:
         for item in (account, key, principal):
             if "project_id" in item:
                 _require(item["project_id"] == b.project_id)
-            _not_expired(item, int(self._now()))
+            expires_at = min(expires_at, _not_expired(item, int(self._now())))
         self._validate()
-        return {
+        _require(int(self._now()) < expires_at)
+        facts = {
             "project_id": b.project_id,
             "credential_project_id": b.project_id,
             "credential_identity_digest": c.digest,
@@ -187,6 +193,7 @@ class AdminReadOnlyCollector:
             "service_account_ref": c.service_account_ref,
             "handle_ref": c.handle_ref,
         }
+        return facts, expires_at
 
     def spend(self):
         self._validate()
@@ -302,20 +309,22 @@ class ProviderReadOnlyCollector:
             if check in {"account_project_binding", "spend_controls"}:
                 _require(type(self._admin) is AdminReadOnlyCollector)
                 _require(self._admin._binding == binding and self._admin._identity == c)
-                facts = (
-                    self._admin.account()
-                    if check == "account_project_binding"
-                    else self._admin.spend()
-                )
+                if check == "account_project_binding":
+                    facts, provider_expiry = self._admin._account_evidence()
+                    expires_at = min(expires_at, provider_expiry)
+                else:
+                    facts = self._admin.spend()
                 expires_at = min(expires_at, self._admin._validate().expires_at)
             elif check == "agent_configuration":
                 _require(type(self._canary) is CanaryReadOnlyCollector)
                 _require(self._canary._binding == binding and self._canary._identity == c)
                 facts = self._canary.agent()
             elif check == "credential_scope":
+                self._validate_canary_handle(binding, c)
                 evidence = self._scope_source.read_scope(binding, c)
                 _require(type(evidence) is ScopeEvidence)
                 evidence.validate(binding, c, int(self._now()), self._scope_verifier)
+                self._validate_canary_handle(binding, c)
                 observed_at, expires_at = evidence.observed_at, min(expires_at, evidence.expires_at)
                 facts = {
                     "credential_identity_digest": c.digest,
@@ -341,6 +350,12 @@ class ProviderReadOnlyCollector:
         except Exception:
             observation = None
         return observation
+
+    def _validate_canary_handle(self, binding, identity):
+        if self._canary is not None:
+            _require(type(self._canary) is CanaryReadOnlyCollector)
+            _require(self._canary._binding == binding and self._canary._identity == identity)
+            self._canary._validate()
 
     def report(self):
         checks, _ = ReadOnlyVerifier(self).inspect(self._binding, int(self._now()), self._identity)

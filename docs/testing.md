@@ -241,3 +241,10 @@ Die bestehende Suite wird unverändert zusätzlich ausgeführt.
 [Vertrag, Negativmatrix und Live-Blocker](dt-017a-readonly-provider.md).
 **real_submissions = 0 · LIVE = NO-GO.**
 **OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
+
+
+DT-017A-Nachprüfung: Sechs zusätzliche Regressionen prüfen die Verkürzung der
+Account-Evidence auf Key-/Service-Account-/Owner-Ablauf, abgelaufene gecachte
+Observations, Ablauf während der abschließenden Handleprüfung sowie Canary-
+Handlewechsel vor oder während der externen Scope-Verifikation. Die separate
+Scope-Attestation gewährt weiterhin keine Transport- oder Live-Freigabe.

@@ -133,6 +133,71 @@ class CollectorTests(unittest.TestCase):
                 item.update(updates)
                 self.assert_blocked("account_project_binding")
 
+    def test_provider_expiry_caps_account_observation_for_each_owner_record(self):
+        for target in ("account", "key", "principal"):
+            self.h = Harness()
+            item = (
+                self.h.key["owner"]["service_account"]
+                if target == "principal"
+                else getattr(self.h, target)
+            )
+            item["expires_at"] = NOW + 2
+            observation = self.h.collector.read(self.h.bound, "account_project_binding")
+            self.assertIsNotNone(observation)
+            self.assertEqual(observation.expires_at, NOW + 2)
+            cached = Mock(read=Mock(return_value=observation))
+            checks, _ = ReadOnlyVerifier(cached).inspect(self.h.bound, NOW + 2, self.h.identity)
+            self.assertEqual(checks["account_project_binding"], "MISSING_OR_INVALID")
+
+    def test_shortest_provider_expiry_wins_without_changing_public_account_facts(self):
+        self.h.account["expires_at"] = NOW + 30
+        self.h.key["expires_at"] = NOW + 20
+        self.h.key["owner"]["service_account"]["expires_at"] = NOW + 10
+        observation = self.h.collector.read(self.h.bound, "account_project_binding")
+        self.assertEqual(observation.expires_at, NOW + 10)
+        self.assertEqual(self.h.admin.account(), observation.facts)
+        self.assertNotIn("expires_at", observation.facts)
+
+    def test_provider_expiry_during_final_handle_check_blocks_account(self):
+        self.h.key["expires_at"] = NOW + 1
+        original = self.h.admin._validate
+        calls = 0
+
+        def delayed_validation():
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                self.h.clock = NOW + 1
+            return original()
+
+        self.h.admin._validate = delayed_validation
+        self.assertIsNone(self.h.collector.read(self.h.bound, "account_project_binding"))
+
+    def test_scope_verifier_cannot_replace_actual_canary_handle(self):
+        def replace_handle(evidence):
+            self.h.canary._transport._store = SyntheticStore(
+                credential_identity(handle_ref="foreign")
+            )
+            return True
+
+        self.h.collector._scope_verifier = Mock(verify=replace_handle)
+        self.assertIsNone(self.h.collector.read(self.h.bound, "credential_scope"))
+        self.assertEqual(self.h.calls, [])
+
+    def test_changed_canary_handle_blocks_before_scope_source(self):
+        source = Mock()
+        self.h.collector._scope_source = source
+        self.h.canary._transport._store = SyntheticStore(credential_identity(handle_ref="foreign"))
+        self.assertIsNone(self.h.collector.read(self.h.bound, "credential_scope"))
+        source.read_scope.assert_not_called()
+        self.assertEqual(self.h.calls, [])
+
+    def test_scope_remains_separately_attestable_without_canary_transport(self):
+        self.h.collector._canary = None
+        self.assertEqual(self.h.check("credential_scope"), "PASS")
+        self.assertEqual(self.h.check("agent_configuration"), "MISSING_OR_INVALID")
+        self.assertEqual(self.h.collector.report()["live"], "NO-GO")
+
     def test_missing_duplicate_or_incomplete_listing_blocks(self):
         for path in ("/service_accounts", "/api_keys?owner_project_access=any"):
             for change in ("missing", "duplicate", "pagination", "malformed", "too_many"):

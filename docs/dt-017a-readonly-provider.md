@@ -177,3 +177,19 @@ Am 23.10.2026 lesend geprüft; kein Provider-Account-GET wurde ausgeführt:
 Die im Issue verlinkte CLI-Spend-Referenz war beim Abruf nicht erreichbar; der
 GET-Vertrag wurde anhand der offiziellen API-Referenz desselben Resources geprüft.
 Es wurden keine zusätzlichen Provider-Endpunkte ergänzt.
+
+
+## Nachprüfung der Evidence-Fristen
+
+Die Account-Observation endet spätestens beim frühesten ausdrücklich gemeldeten
+Ablauf von Key, Service Account oder Key-Owner. Der Ablauf wird nach den GETs und
+der abschließenden Handleprüfung erneut berücksichtigt. Eine zuvor gespeicherte
+Observation kann deshalb nach Providerablauf auch innerhalb der üblichen
+300-Sekunden-Frist keinen PASS mehr erzeugen. Fehlende oder null-Ablaufwerte im
+optionalen Providerschema bleiben unverändert behandelt; sie beweisen keine Scopes.
+
+Wenn ein Canary-Collector vorhanden ist, prüft der Scope-Adapter dessen tatsächliche
+immutable Identität und Handlebindung vor dem externen Scope-Read sowie nach der
+unabhängigen Signaturprüfung. Ein Handlewechsel innerhalb des externen Verifiers
+wird verworfen. Eine separate Account-Attestation ohne Canary-Transport kann nur
+das Scope-Gate erfüllen; Transport, Secret-Store und übrige Live-Gates bleiben gesperrt.
