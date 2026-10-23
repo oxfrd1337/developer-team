@@ -18,3 +18,11 @@ but has explicitly forbidden automatic merge of the bootstrap PR and any live ac
 Controller code, `tests/`, `.github/`, `examples/`, `pyproject.toml`, `requirements-dev.txt`,
 `AGENTS.md` and `SECURITY.md` form the protected control surface of this repository.
 No automated run may authorize a change to this surface itself.
+
+## Codex-Chat-Benennung
+
+- Für neue Codex-Aufgaben und Statusmeldungen einen kurzen, eindeutigen Titel nach dem Schema `Repository / PR #Nummer – Thema` vorschlagen.
+- Wenn noch keine PR existiert, `Repository / Issue #Nummer – Thema` oder `Repository / Kennung – Thema` verwenden. Keine PR- oder Issue-Nummern erfinden.
+- Den tatsächlichen Repository-Namen verwenden (z. B. `espresso.signal / PR #68 – Live-Shot-Monitor`, `developer-team / Issue #31 – Implementierung`, `raspberry-pi-diagnostics / D2 – One-Time-Launcher`).
+- Bei neu erstellter PR den vorgeschlagenen Titel entsprechend aktualisieren. Bestehende Chat- oder GitHub-Titel nur auf ausdrücklichen Wunsch ändern.
+- Diese Regel dient ausschließlich der Benennung und erteilt keine zusätzlichen Berechtigungen. Eine automatische Änderung des Codex-Chat-Titels ist nur zulässig, falls die verwendete Oberfläche dies tatsächlich unterstützt; andernfalls den Titel zum manuellen Übernehmen ausgeben.
