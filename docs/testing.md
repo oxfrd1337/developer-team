@@ -229,3 +229,15 @@ unabhängige frische Read-only-Transport-Attestation einschließlich Origin, Pro
 Credentialidentität, TLS-Regeln, Route und Widerruf direkt am Wire. Alle Attestierungen
 und Transportproben sind synthetisch; kein echter OpenAI-Aufruf. Ein verfügbarer
 Transport ohne diese Evidence meldet `real_transport=MISSING_OR_INVALID` und NO-GO.
+
+## DT-017A
+
+`python -m unittest tests.test_provider_readonly -v` prüft die GET-only-Grenze,
+getrennte Admin-/Canary-Identitäten, Account-/Owner-/Expiry-Bindung, reale
+Response-Schemas für Spend/Modelle/Agent, separat authentifizierte Scope-Evidence,
+Sanitisierung und Transportlimits. Ausschließlich synthetische HTTP-Fixtures;
+keine echten Provider-Credentials, keine echten OpenAI-Aufrufe in CI.
+Die bestehende Suite wird unverändert zusätzlich ausgeführt.
+[Vertrag, Negativmatrix und Live-Blocker](dt-017a-readonly-provider.md).
+**real_submissions = 0 · LIVE = NO-GO.**
+**OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**

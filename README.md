@@ -1,5 +1,14 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
+## DT-017A: ausschließlich lesende Provider-Collector
+
+[Getrennte Admin-/Canary-GETs und Scope-Attestation](docs/dt-017a-readonly-provider.md)
+liefern normalisierte Evidence an DT-017. Ohne externe Handles deaktiviert;
+fehlender Scope-Nachweis bleibt gesperrt. Keine Provider-Mutationen.
+**real_submissions = 0 · LIVE = NO-GO.**
+**OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
+
+
 ## DT-017: kontrollierte Pre-Live-Abnahme
 
 [Transport, Accountprüfung und Operator-Halt](docs/dt-017-controlled-acceptance.md):
