@@ -369,9 +369,7 @@ def capsule_report(state: object) -> dict:
         "usage_cents": current["usage_cents"],
         "budget_cents": current["budget_cents"],
         "operator_gate": (
-            "STRUCTURALLY_RECORDED_NOT_AUTHORITY"
-            if current["grant"] is not None
-            else "MISSING"
+            "STRUCTURALLY_RECORDED_NOT_AUTHORITY" if current["grant"] is not None else "MISSING"
         ),
         "live": "NO-GO",
         "provider_adapter_present": False,
