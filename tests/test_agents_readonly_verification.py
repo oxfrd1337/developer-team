@@ -99,9 +99,7 @@ class AgentsReadOnlyVerificationTests(unittest.TestCase):
     def test_account_gate_cannot_be_satisfied_by_public_documentation(self):
         evidence = synthetic_reference_evidence(NOW)
         evidence[3]["source_kind"] = "official_documentation"
-        evidence[3]["source_ref"] = (
-            "https://developers.openai.com/api/docs/guides/spend-limits"
-        )
+        evidence[3]["source_ref"] = "https://developers.openai.com/api/docs/guides/spend-limits"
         report = self.evaluate(evidence)
         self.assertIn("unexpected_source_kind", report["reasons"][0])
 
