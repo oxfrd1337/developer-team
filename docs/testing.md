@@ -3,10 +3,11 @@
 ## DT-016
 
 ```sh
-python -m unittest tests.test_agents_api tests.test_agents_api_journal -v
+python -m unittest tests.test_agents_api tests.test_agents_api_journal tests.test_agents_api_review -v
 ```
 
-Die 65 zusätzlichen Tests verwenden ausschließlich injizierte, credentialfreie
+Die 100 DT-016-Tests (65 ursprüngliche und 35 zusätzliche Review-Regressionen) verwenden
+ausschließlich injizierte, credentialfreie
 Wire-Fixtures und lokale SQLite-Journale in Speicher oder temporären Verzeichnissen.
 Session-Create und Message-Submit werden getrennt geprüft. Die Negativmatrix umfasst
 Idempotency-/Bindungswechsel, verlorene Antworten, ausschließlich lesende Reconciliation,
@@ -14,6 +15,13 @@ konkurrierende Controller, Journal-/Receipt-Verlust, Projekt-/Key-/Scope-/Spend-
 verfallene Grants und unmittelbare Submit-Freigabe, 401/403/429/5xx, Cancel ohne
 Terminalbestätigung, getrennte completed/failed/cancelled-Zustände, Secret-Leakage sowie
 Byte-, Ereignis-, Request- und Timeoutgrenzen. Bestehende Tests bleiben unverändert.
+
+Die Review-Regressionen für PR #32 prüfen außerdem technisch deaktiviertes Outbound-Netz,
+explizite kleine Container und unveränderte Environment-ID, vollständig gepinnte effektive
+Agent-Konfiguration einschließlich Modell/Reasoning/Service Tier sowie eigene frische,
+bindungsbezogene Freigaben für Create, Submit und Cancel direkt vor jedem POST. Fehlende,
+alte, zukünftige oder falsche Freigaben, Saved-Agent-Drift und Konfigurationsabweichungen
+werden abgelehnt. Verzögerungen im Journal oder externen Verifier verlängern keine Freigabe.
 
 Die vorhandene CI-Matrix führt diese Tests mit allen bisherigen Lint-, Format-,
 Coverage-, Build-, Smoke- und Checkpoint-Anforderungen unter Python 3.11–3.13 aus.

@@ -16,7 +16,6 @@ from dataclasses import asdict, replace
 from decimal import Decimal
 
 from .agents_api_contracts import (
-    CANARY_INSTRUCTIONS,
     CANARY_MESSAGE,
     PROVIDER_BASE,
     SESSIONS_PATH,
@@ -87,6 +86,22 @@ def _report(state: CanaryState) -> dict:
     }
 
 
+def _matches_configuration(actual: object, expected: object) -> bool:
+    """Compare native JSON shapes strictly, including false versus 0 and missing versus null."""
+    if type(actual) is not type(expected):
+        return False
+    if type(expected) is dict:
+        return actual.keys() == expected.keys() and all(
+            _matches_configuration(actual[key], value) for key, value in expected.items()
+        )
+    if type(expected) is list:
+        return len(actual) == len(expected) and all(
+            _matches_configuration(left, right)
+            for left, right in zip(actual, expected, strict=True)
+        )
+    return actual == expected
+
+
 class AgentsAPIAdapter:
     def __init__(
         self,
@@ -117,6 +132,7 @@ class AgentsAPIAdapter:
         try:
             now = int(self._now())
             permit = self._gate.authorize(self._binding, operation, now)
+            now = int(self._now())  # A slow verifier must not validate against its old start time.
         except Exception:
             permit = None
         if type(permit) is not ExternalPermit:
@@ -176,6 +192,14 @@ class AgentsAPIAdapter:
         )
         if message_key:
             headers += (("Idempotency-Key", state.idempotency_key),)
+        if method == "POST":
+            # Final check AFTER durable writes: journal delays must not extend an approval.
+            # Cancel has its own fresh approval, independent of expired start grants.
+            # Every POST re-enters the external gate.
+            operation = "submit_canary" if message_key else (
+                "create_session" if path == SESSIONS_PATH else "cancel"
+            )
+            self._authorize(operation)
         started = self._monotonic()
         request = WireRequest(
             method,
@@ -249,11 +273,10 @@ class AgentsAPIAdapter:
             raise AgentsAPIError("provider_record_limit_exceeded")
         return [self._record(record) for record in records]
 
-    def _session(self, value: dict, state: CanaryState) -> tuple[str, str, bool]:
+    def _session(self, value: dict, state: CanaryState) -> tuple[str, str, str, bool]:
         self._record(value)
         identifier, agent = value.get("id"), value.get("agent")
         environment = value.get("environment")
-        multi_agent = agent.get("multi_agent") if type(agent) is dict else None
         status = value.get("status")
         if (
             value.get("object") != "agent.session"
@@ -263,17 +286,35 @@ class AgentsAPIAdapter:
             or value.get("project_id", self._binding.project_id) != self._binding.project_id
             or type(agent) is not dict
             or agent.get("id") != self._binding.agent_id
-            or agent.get("tools") != []
-            or type(multi_agent) is not dict
-            or multi_agent.get("enabled") is not False
-            or agent.get("instructions") != CANARY_INSTRUCTIONS
-            or type(environment) is not dict
-            or environment.get("type") != "openai_hosted"
             or value.get("vault_ids") != []
             or type(status) is not str
             or status not in {"idle", "in_progress", "requires_action", "failed"}
         ):
             raise AgentsAPIError("provider_session_binding_mismatch")
+        expected_agent = self._binding.agent_configuration
+        expected_agent["multi_agent"]["max_concurrent_subagents"] = None
+        if (
+            set(agent) - {"id", "name"} != set(expected_agent)
+            or not _matches_configuration(
+                {key: agent[key] for key in expected_agent}, expected_agent
+            )
+        ):
+            raise AgentsAPIError("provider_effective_agent_mismatch")
+        expected_environment = self._binding.environment_configuration
+        del expected_environment["env"]  # The public response omits environment-variable values.
+        if (
+            type(environment) is not dict
+            or not safe_ref(environment.get("id"))
+            or (
+                state.environment_id is not None
+                and environment["id"] != state.environment_id
+            )
+            or set(environment) - {"id"} != set(expected_environment)
+            or not _matches_configuration(
+                {key: environment[key] for key in expected_environment}, expected_environment
+            )
+        ):
+            raise AgentsAPIError("provider_effective_environment_mismatch")
         spend = value.get("spend_control")
         if (
             type(spend) is not dict
@@ -288,14 +329,16 @@ class AgentsAPIAdapter:
             or not 0 <= consumed <= 1_000_000_000
         ):
             raise AgentsAPIError("invalid_provider_spend_observation")
-        return identifier, str(consumed), consumed > self._binding.budget_cents
+        return (
+            identifier, environment["id"], str(consumed), consumed > self._binding.budget_cents
+        )
 
     def _read_session(self, revision: int, state: CanaryState) -> tuple[int, CanaryState, dict]:
         revision, state, response = self._request(
             revision, state, "GET", f"{SESSIONS_PATH}/{state.session_id}"
         )
         value = _json(response.body)
-        _, consumed, exceeded = self._session(value, state)
+        _, _, consumed, exceeded = self._session(value, state)
         revision, state = self._commit(
             revision,
             replace(
@@ -333,12 +376,8 @@ class AgentsAPIAdapter:
             SESSIONS_PATH,
             {
                 "agent_id": self._binding.agent_id,
-                "agent": {
-                    "instructions": CANARY_INSTRUCTIONS,
-                    "tools": [],
-                    "multi_agent": {"enabled": False},
-                },
-                "environment": {"type": "openai_hosted"},
+                "agent": self._binding.agent_configuration,
+                "environment": self._binding.environment_configuration,
                 "metadata": self._metadata,
                 "spend_control": {"limit": self._binding.budget_cents},
                 "stream": False,
@@ -346,7 +385,7 @@ class AgentsAPIAdapter:
             expected_status=201,
         )
         value = _json(response.body)
-        identifier, consumed, exceeded = self._session(value, state)
+        identifier, environment_id, consumed, exceeded = self._session(value, state)
         if value.get("status") != "idle" or value.get("required_actions") != []:
             raise AgentsAPIError("session_not_empty_and_idle")
         _, state = self._commit(
@@ -355,6 +394,7 @@ class AgentsAPIAdapter:
                 state,
                 phase="SESSION_READY",
                 session_id=identifier,
+                environment_id=environment_id,
                 consumed_cents=consumed,
                 budget_exceeded=exceeded,
             ),
@@ -456,7 +496,7 @@ class AgentsAPIAdapter:
             ]
             if len(candidates) != 1:
                 raise AgentsAPIError("session_reconstruction_requires_operator")
-            identifier, consumed, exceeded = self._session(candidates[0], state)
+            identifier, environment_id, consumed, exceeded = self._session(candidates[0], state)
             if candidates[0].get("status") != "idle" or candidates[0].get("required_actions") != []:
                 raise AgentsAPIError("session_not_empty_and_idle")
             revision, state, _ = self._read_turns(revision, state, identifier)
@@ -465,6 +505,7 @@ class AgentsAPIAdapter:
                 replace(
                     state,
                     session_id=identifier,
+                    environment_id=environment_id,
                     phase="SESSION_READY",
                     consumed_cents=consumed,
                     budget_exceeded=exceeded,

@@ -64,6 +64,7 @@ class CanaryBinding:
     idempotency_key: str
     plan_digest: str
     budget_cents: int
+    model: str
     provider_base: str = PROVIDER_BASE
 
     def validate(self) -> None:
@@ -78,12 +79,54 @@ class CanaryBinding:
             raise AgentsAPIError("invalid_plan_digest")
         if not bounded_int(self.budget_cents, 1, 100):
             raise AgentsAPIError("invalid_local_budget")
+        if (
+            type(self.model) is not str
+            or not 1 <= len(self.model) <= 96
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", self.model) is None
+            or any(marker in self.model.lower() for marker in ("sk-", "sk_", "bearer", "token"))
+        ):
+            raise AgentsAPIError("invalid_bound_model")
+
+    @property
+    def agent_configuration(self) -> dict:
+        # Override every execution/cost-relevant saved-agent field, including nested defaults.
+        # A disabled multi-agent response has max_concurrent_subagents=null per the contract.
+        return {
+            "model": self.model,
+            "instructions": CANARY_INSTRUCTIONS,
+            "tools": [],
+            "multi_agent": {"enabled": False},
+            "reasoning": {"effort": "low", "summary": None},
+            "service_tier": "default",
+            "text": {"format": {"type": "text"}, "verbosity": "low"},
+        }
+
+    @property
+    def environment_configuration(self) -> dict:
+        # This is a new inline sandbox, never an inherited template or prewarmed environment.
+        return {
+            "type": "openai_hosted",
+            "container_size": "small",
+            "network": {"access": "disabled", "allowed_domains": []},
+            "desktop": {"enabled": False},
+            "capability_directories": [],
+            "env": {},
+            "files": [],
+            "packages": {"npm": [], "python": [], "system": []},
+            "plugins": [],
+            "skills": [],
+        }
 
     @property
     def digest(self) -> str:
         self.validate()
         return sha256(
-            {**asdict(self), "message": CANARY_MESSAGE, "instructions": CANARY_INSTRUCTIONS}
+            {
+                **asdict(self),
+                "message": CANARY_MESSAGE,
+                "agent": self.agent_configuration,
+                "environment": self.environment_configuration,
+            }
         )
 
 
@@ -130,7 +173,12 @@ class ExternalPermit:
     grant_budget_cents: int
     grant_issued_at: int
     grant_expires_at: int
+    create_approved_at: int | None = None
+    create_approval_binding_digest: str | None = None
     submit_approved_at: int | None = None
+    submit_approval_binding_digest: str | None = None
+    cancel_approved_at: int | None = None
+    cancel_approval_binding_digest: str | None = None
     provider_base: str = PROVIDER_BASE
     source: str = "controlled-account-readonly-verifier"
     secret_store_verified: bool = False
@@ -175,6 +223,12 @@ class ExternalPermit:
             or not bounded_int(self.expires_at, now + 1, self.observed_at + 3600)
         ):
             raise AgentsAPIError("stale_external_verification")
+        if operation == "cancel" and (
+            type(self.cancel_approval_binding_digest) is not str
+            or self.cancel_approval_binding_digest != binding.digest
+            or not bounded_int(self.cancel_approved_at, max(0, now - 60), now)
+        ):
+            raise AgentsAPIError("fresh_cancel_approval_required")
         # Read/stop operations remain available after start-grant expiry or budget exhaustion.
         if operation not in {"create_session", "submit_canary"}:
             return
@@ -191,8 +245,16 @@ class ExternalPermit:
             or not bounded_int(self.grant_expires_at, now + 1, self.grant_issued_at + 3600)
         ):
             raise AgentsAPIError("external_single_canary_grant_required")
-        if operation == "submit_canary" and not bounded_int(
-            self.submit_approved_at, max(0, now - 60), now
+        if operation == "create_session" and (
+            type(self.create_approval_binding_digest) is not str
+            or self.create_approval_binding_digest != binding.digest
+            or not bounded_int(self.create_approved_at, max(self.grant_issued_at, now - 60), now)
+        ):
+            raise AgentsAPIError("fresh_first_create_approval_required")
+        if operation == "submit_canary" and (
+            type(self.submit_approval_binding_digest) is not str
+            or self.submit_approval_binding_digest != binding.digest
+            or not bounded_int(self.submit_approved_at, max(self.grant_issued_at, now - 60), now)
         ):
             raise AgentsAPIError("fresh_first_submit_approval_required")
 
@@ -240,6 +302,7 @@ class CanaryState:
     cancel_attempts: int = 0
     request_count: int = 0
     session_id: str | None = None
+    environment_id: str | None = None
     turn_id: str | None = None
     terminal_kind: str | None = None
     consumed_cents: str | None = None
@@ -275,12 +338,13 @@ class CanaryState:
             for v in (self.session_attempts, self.message_attempts, self.cancel_attempts)
         ) or not bounded_int(self.request_count, 0, 32):
             raise AgentsAPIError("invalid_journal_counters")
-        for value in (self.session_id, self.turn_id):
+        for value in (self.session_id, self.environment_id, self.turn_id):
             if value is not None and not safe_ref(value):
                 raise AgentsAPIError("invalid_journal_reference")
         if (
             (self.phase == "PREPARED") != (self.session_attempts == 0)
             or (self.phase in {"PREPARED", "SESSION_UNCERTAIN"}) != (self.session_id is None)
+            or (self.session_id is None) != (self.environment_id is None)
             or (self.phase in {"PREPARED", "SESSION_UNCERTAIN", "SESSION_READY"})
             != (self.message_attempts == 0)
             or (self.phase in {"TURN_BOUND", "CANCEL_UNCERTAIN", "CANCEL_REQUESTED", "TERMINAL"})

@@ -22,6 +22,42 @@ Rechenfrage `CANARY_MESSAGE`. Toolliste und Subagents werden bei Session-Erstell
 ausdrücklich deaktiviert; Credentials, Vaults und Repositories werden nicht übergeben.
 Der Adapter enthält keine GitHub-, Repository-, Merge- oder Deploymentoperation.
 
+## Korrekturen der drei blockierenden Reviews in PR #32
+
+Ausgangs-HEAD: `49c1e32274448a92ab4a1f0cac643d2380fe51a1`.
+Die Korrekturen bleiben auf `dt-016-agents-api-provider`; die Review-Threads werden
+nicht durch die Implementierung selbst als gelöst markiert.
+
+| Review-Befund | Konkrete Korrektur | Regressionen |
+| --- | --- | --- |
+| [Hosted-Environment unzureichend begrenzt](https://github.com/oxfrd1337/developer-team/pull/32#discussion_r4356706786) | `CanaryBinding.environment_configuration` setzt `network.access=disabled`, leere Domainlisten, `container_size=small`, deaktivierten Desktop und leere Pakete/Skills/Plugins/Dateien/Capabilities. `_session` prüft die effektive Response strikt und persistiert die Environment-ID gemeinsam mit der Session-ID. | `HostedEnvironmentReviewTests`: aktiviertes, eingeschränktes, fehlendes oder widersprüchliches Netz; andere/fehlende Containergröße; zusätzliche Capabilities; Drift vor Submit und bei Reconciliation. |
+| [Saved-Agent-Drift](https://github.com/oxfrd1337/developer-team/pull/32#discussion_r4356706790) | `CanaryBinding.model` ist Pflicht. `agent_configuration` überschreibt Modell, Instructions, Tools, Subagents, Reasoning, Service Tier und Textformat vollständig. Der Bindungsdigest umfasst beide kompletten Konfigurationen. `_session` prüft die tatsächlich zurückgemeldeten Werte ohne Default-Fallback. | `SavedAgentReviewTests`: geänderter Saved Agent wird übersteuert; ignorierte Pins, fehlende Werte, verschachtelte Defaults und spätere Drift sperren; alter Permit/Grant/Journalzustand gilt nicht für eine neue Konfiguration. |
+| [Kostenfreigabe vor Session-Create fehlt](https://github.com/oxfrd1337/developer-team/pull/32#discussion_r4356706798) | `ExternalPermit` verlangt eigene frische, digestgebundene Freigaben für Create und Submit; auch Cancel besitzt eine eigene aktuelle Operationsfreigabe. `_request` fragt den externen Gate nach den dauerhaften Journalupdates direkt vor jedem POST erneut ab. `_authorize` prüft mit der Uhrzeit nach Rückkehr des Verifiers. | `FreshCreationApprovalReviewTests`: fehlende, alte, zukünftige, falsch typisierte oder falsch gebundene Freigaben sowie Verfall/Widerruf während Journalarbeit und verzögertem Verifier; Freigaben sind zwischen Operationen nicht austauschbar. |
+
+Der Container wird ausschließlich als neue Inline-Konfiguration angefordert; weder eine
+Template-ID noch eine vorgewärmte Environment-ID wird übergeben. Die Response muss
+`small`, `network={access: disabled, allowed_domains: []}` und den abgeschalteten Desktop
+explizit bestätigen. Fehlende oder unbekannte Werte und zusätzliche operative Felder
+sperren. Die öffentliche Response gibt keine Environment-Variablenwerte zurück; ihr
+Fehlen ist kein externer Secret-Store-Nachweis. Die Request-Variablen sind explizit leer.
+Prompt-Instruktionen werden **nicht** als technische Netzwerk- oder Schreibgrenze gewertet.
+
+Mit `agent_id` überschreiben laut öffentlichem Vertrag nur mitgesendete Agent-Felder die
+gespeicherten Werte. Deshalb werden alle auswirkungsrelevanten Felder ausdrücklich
+mitgesendet: das extern zu prüfende gebundene Modell, `reasoning={effort: low, summary: null}`,
+`service_tier=default`, Textformat `text` mit `verbosity=low` sowie leere Tools und
+deaktivierte Subagents. Die Response muss für deaktivierte Subagents zusätzlich
+`max_concurrent_subagents=null` melden. Nur die beschreibenden Identitätsfelder `id` und
+optional `name` bleiben außerhalb dieses Konfigurationsvergleichs; die Agent-ID wird
+gesondert gebunden geprüft. Das Modell wird nicht automatisch ausgewählt. Tests verwenden
+ausschließlich einen erfundenen Modellnamen. Kompatibilität, Verfügbarkeit und Kosten
+eines echten Modells bleiben externe Live-Gates.
+
+Alte Bindungsdigests, Permits und Journale ohne Environment-ID werden nicht automatisch
+migriert oder neu vorbereitet. Der Controller muss einen widersprüchlichen Altzustand
+extern klären. Ein SHA-256-Digest bindet die Konfiguration strukturell und ersetzt keine
+unabhängige Betreiberattestierung.
+
 ## Getrennte Provideroperationen
 
 | Methode | Wire-Vertrag | Dauerhaft reservierter Zustand |
@@ -33,7 +69,8 @@ Der Adapter enthält keine GitHub-, Repository-, Merge- oder Deploymentoperation
 
 Für Session-Erstellung wird **kein** undokumentierter Idempotency-Key behauptet.
 Auch das Erstellen einer Hosted-Session kann Ressourcen provisionieren und Kosten
-verursachen; deshalb benötigt bereits Create externe Prüfung und einen Operator-Grant.
+verursachen; deshalb benötigt bereits Create externe Prüfung, einen Operator-Grant und
+eine eigene unmittelbare Einzelfreigabe (`create_approved_at`).
 Es wurde ausschließlich gegen Fixtures ausgeführt.
 
 Die dokumentierte Message-Idempotency erlaubt Wiederholungen mit exakt gleicher Session,
@@ -70,9 +107,19 @@ Create und Submit benötigen frische unabhängige Nachweise für:
   Key- **und** Projekt-/Benutzerrechte, einschließlich Stop-/Lesefähigkeit;
 - externen Secret Store, tatsächlich beobachtete Spend Controls und den aktuellen Vertrag;
 - sicher geprüfte Agentenkonfiguration und verifizierten externen Einmal-Grant mit Budget;
-- beim ersten Message-Submit zusätzlich eine erneute ausdrückliche Betreiberfreigabe
-  unmittelbar vor dem Submit, höchstens 60 Sekunden alt. Sie wird nach den lesenden
-  Vorprüfungen erneut abgefragt.
+- vor Session-Create und erstem Message-Submit jeweils eine eigene ausdrückliche
+  Betreiberfreigabe, höchstens 60 Sekunden alt und nicht vor dem zugehörigen Grant erteilt.
+  `create_approved_at`/`submit_approved_at` und die jeweiligen
+  `*_approval_binding_digest`-Felder dürfen zwischen Operationen nicht ausgetauscht werden.
+
+Jeder Provider-POST prüft seine Operationsfreigabe unmittelbar nach den Journalupdates
+erneut. Auch Cancel verlangt `cancel_approved_at` samt identischem Bindungsdigest mit
+höchstens 60 Sekunden Alter. Seine Stopfreigabe ist unabhängig von abgelaufenen
+Start-Grants und erlaubt keinen neuen Start. Rein lesende Reconciliation braucht keine
+neue Kostenfreigabe. Fehlt die frische Freigabe oder verfällt sie während der Vorbereitung,
+erfolgt kein POST. Ein bereits reservierter Unknown-Zustand bleibt konservativ gesperrt;
+er wird nicht automatisch zurückgesetzt. Auch ein langsamer externer Verifier verlängert
+das Freigabefenster nicht, da mit der Uhrzeit nach seiner Rückkehr validiert wird.
 
 Die Capabilitynamen im Pythonvertrag sind lokale Normalisierungen; der externe Verifier
 muss die tatsächlichen OpenAI-Rechte korrekt darauf abbilden. Die Evidenz-TTL ist auf
@@ -106,6 +153,7 @@ Bei ausgeschöpftem Budget ist ein Message-Submit gesperrt. Spend Controls wirke
 sofortig und können geringfügig überschritten werden. Die lokale Grenze ist kein
 garantierter Abrechnungshardstop. Lesen und Cancel brauchen nach Ablauf des Start-Grants
 oder Budgetüberschreitung weiterhin gültige Projekt-/Scope-Nachweise, keine neue Startfreigabe.
+Cancel benötigt außerdem seine eigene frische Stopfreigabe.
 
 Standardgrenzen: 5 Sekunden pro Request, 65.536 Responsebytes, 8.192 Bytes je verarbeitetem
 Session-/Turnobjekt, 20 Datensätze pro Seite und insgesamt 16 Requests einschließlich
@@ -130,13 +178,14 @@ HTTP 202 und ein Cancel-Request sind kein Terminalnachweis. Fremde/mehrere Turns
 Subagent-Turns, widersprüchliche Terminals und Terminalregressionen sperren. Wiederholtes
 Lesen desselben Terminalstatus bleibt erlaubt. Ein Terminal ersetzt keine Kostenprüfung.
 
-65 neue Tests prüfen die Vertrags- und Negativmatrix, einschließlich echter lokaler
+100 DT-016-Tests (65 ursprüngliche und 35 Review-Regressionen) prüfen die Vertrags- und
+Negativmatrix, einschließlich echter lokaler
 SQLite-Neustarts, konkurrierender Verbindungen, fehlgeschlagener Write-ahead-/Receipt-Commits,
 verlorener Antworten und blockierter Transportworker. Sämtliche Providerantworten und
 Seiteneffekte sind Fixtures. Bestehende 371 Testmethoden bleiben unverändert.
 
 ```sh
-python -m unittest tests.test_agents_api tests.test_agents_api_journal -v
+python -m unittest tests.test_agents_api tests.test_agents_api_journal tests.test_agents_api_review -v
 python -m unittest discover -s tests -t . -v
 python -m ruff check developer_team tests
 python -m ruff format --check --diff developer_team tests
@@ -163,6 +212,9 @@ kontrollierte Abnahme einschließlich Reconciliation sowie Terminal- und Kostenp
 
 - [Session-Lifecycle, Message-Idempotency und Cancel](https://developers.openai.com/api/docs/guides/agents-api/sessions)
 - [Session-Create einschließlich SpendControl](https://developers.openai.com/api/reference/python/resources/beta/subresources/agents/subresources/sessions/methods/create)
+- [Effektive Hosted-Environment- und Agent-Konfiguration](https://developers.openai.com/api/reference/resources/beta/subresources/agents/subresources/sessions/methods/create)
+- [Hosted-Sandboxes und technische Netzwerkpolicy](https://developers.openai.com/api/docs/guides/agents-api/environments/openai-hosted)
+- [Gespeicherte Agenten und Session-Overrides](https://developers.openai.com/api/docs/guides/agents-api/configuration)
 - [Events: Idempotency-Key und HTTP-202-Grenze](https://developers.openai.com/api/reference/resources/beta/subresources/agents/subresources/sessions/subresources/events/methods/create)
 - [Persistierte Turns und getrennte Terminalstatus](https://developers.openai.com/api/reference/resources/beta/subresources/agents/subresources/sessions/subresources/turns/methods/list)
 - [Effektive Projekt-/Key-Rechte](https://developers.openai.com/api/docs/guides/rbac)

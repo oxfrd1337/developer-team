@@ -7,7 +7,6 @@ from dataclasses import replace
 
 from developer_team.adapters.agents_api import AgentsAPIAdapter
 from developer_team.adapters.agents_api_contracts import (
-    CANARY_INSTRUCTIONS,
     MINIMAL_CAPABILITIES,
     AgentsAPILimits,
     CanaryBinding,
@@ -19,6 +18,7 @@ from developer_team.adapters.agents_api_journal import SQLiteCanaryJournal
 
 NOW = 1_800_000_000
 SESSION = "session_synthetic"
+ENVIRONMENT = "env_synthetic"
 TURN = "turn_synthetic"
 
 
@@ -31,6 +31,7 @@ def binding(**changes):
             idempotency_key="key_synthetic",
             plan_digest="a" * 64,
             budget_cents=5,
+            model="synthetic-canary-model-v1",
         ),
         **changes,
     )
@@ -53,7 +54,12 @@ def permit(bound=None, **changes):
             grant_budget_cents=5,
             grant_issued_at=NOW,
             grant_expires_at=NOW + 300,
+            create_approved_at=NOW,
+            create_approval_binding_digest=bound.digest,
             submit_approved_at=NOW,
+            submit_approval_binding_digest=bound.digest,
+            cancel_approved_at=NOW,
+            cancel_approval_binding_digest=bound.digest,
             secret_store_verified=True,
             spend_controls_verified=True,
             contract_verified=True,
@@ -98,17 +104,19 @@ class FixtureTransport:
             "object": "agent.session",
             "status": "idle",
             "agent": {
+                **bound.agent_configuration,
                 "id": bound.agent_id,
-                "tools": [],
-                "instructions": CANARY_INSTRUCTIONS,
-                "multi_agent": {"enabled": False},
+                "multi_agent": {"enabled": False, "max_concurrent_subagents": None},
             },
-            "environment": {"type": "openai_hosted"},
+            "environment": {
+                key: value for key, value in bound.environment_configuration.items() if key != "env"
+            },
             "vault_ids": [],
             "required_actions": [],
             "metadata": {"dt016_binding": bound.digest},
             "spend_control": {"limit": bound.budget_cents, "consumed": 0},
         }
+        self.session["environment"]["id"] = ENVIRONMENT
         self.turn = {
             "id": TURN,
             "object": "agent.session.turn",
