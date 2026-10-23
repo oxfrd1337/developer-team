@@ -104,27 +104,64 @@ können niemals `credential_scope=PASS` ergeben.
 `ScopeEvidence` muss von einer kontrollierten Account-/Dashboard-Quelle kommen.
 `scope_source.read_scope(binding, identity)` liefert das streng typisierte Objekt;
 `scope_verifier.verify(evidence)` muss **das vollständige Objekt** unabhängig
-authentifizieren und exakt `True` zurückgeben. Die Signatur ist ein begrenzter,
-undurchsichtiger Nachweis für diesen Verifier. Es gibt keinen JSON-Loader,
-selbst gesetzten `verified`-Schalter oder Standard-Verifier. Ein produktiver
-Attestor/Signaturprüfer muss außerhalb des getesteten Agents provisioniert werden.
-Tests verwenden ausschließlich eine ausdrücklich synthetische Autorität.
+authentifizieren und exakt `True` zurückgeben. Die begrenzte Signatur muss alle
+Felder einschließlich Aussteller und Verifier-Ziel binden. Es gibt keinen
+JSON-Loader, selbst gesetzten `verified`-Schalter oder Standard-Verifier.
+Produktive Source und Verifier werden außerhalb des getesteten Agents provisioniert.
 
-Die vollständige immutable Identität bindet Projekt, Credential, Service Account,
-Handle und Binding-Digest. Evidence darf höchstens 300 Sekunden alt sein, nicht
-in der Zukunft liegen und keine Lease über 300 Sekunden haben. Key-, Principal-
-und effektive Rechte müssen jeweils exakt dieser Liste entsprechen:
+Der Controller verlangt zusätzlich ausdrücklich gepinnte
+`scope_attestor_identity: ScopeAttestorIdentity` und
+`scope_verifier_identity: ScopeVerifierIdentity`. Diese eingefrorenen, rollenspezifischen
+Identitäten enthalten Subject-Referenz, Trust-Domain und öffentlichen Identitätskey-Digest.
+Sie kommen aus vertrauenswürdiger Controller-Provisionierung, niemals aus der Evidence.
+Source und Verifier müssen verschiedene Objekte sein; Subject, Trust-Domain und
+Identitätskey müssen ebenfalls verschieden sein. Der Verifier erhält unabhängig
+provisionierte Aussteller-Verifikationsschlüssel; sein eigener Identitätskey ist
+nicht mit dem Aussteller-Signaturschlüssel zu verwechseln.
 
-- `api.agents.read`
-- `api.agents.write`
-- `api.responses.write`
-- `api.model.read` (dokumentiertes Modell-Listenrecht, Singular)
+Gleiches Objekt, zwei Wrapper mit gleichem Trust-Subjekt, gleiche Domain oder gleicher
+Identitätskey, vertauschte Rollen, ungepinnte oder ausgetauschte Identitäten und eine
+falsche Evidence-Zielidentität bleiben NO-GO. Die Prüfungen laufen vor dem Scope-Read
+und vor/nach der externen Verifikation. Ein Callback darf weder die beteiligten
+Controllerobjekte noch deren Pins austauschen. Die Source kann ihre eigene Evidence
+nicht als Verifier bestätigen. Tests verwenden getrennte `ScopeSource`- und
+`ScopeVerifier`-Fixtures, ausschließlich mit synthetischer Signaturprüfung.
+Python-Objekte/Pins ersetzen nicht die unabhängige produktive Herkunftsprüfung;
+ein produktiver Verifier muss die vollständige Signatur mit externen Trust-Ankern prüfen.
 
-Zusätzliche Rechte, inklusive Files/Web/Admin/all-permissions, sperren.
-Erst nach unabhängiger Authentifizierung erfolgt die Übersetzung auf die
-bestehenden lokalen DT-017-Capabilitynamen. Diese lokalen Namen sind keine
-behaupteten Provider-RBAC-Bezeichner. Auch ein authentifizierter Scope-Nachweis
-erteilt keine Create-/Submit-Zustimmung.
+Die vollständige immutable Credential-Identität bindet Projekt, Credential,
+Service Account, Handle und Binding-Digest. Evidence darf höchstens 300 Sekunden
+alt sein, nicht in der Zukunft liegen und keine Lease über 300 Sekunden haben.
+
+Die drei Berechtigungsebenen sind **getrennte Enum-Typen** in
+`developer_team/scope_evidence.py`. Auch zur Laufzeit wird für jedes Element der
+exakte Typ geprüft. Eine gemeinsame Stringmenge wird nicht mehr akzeptiert.
+
+| API-Key: `KeyPermission` / Providername | Principal: `PrincipalPermission` | Effektiv: `EffectivePermission` |
+| --- | --- | --- |
+| `AGENTS_READ` / `api.agents.read` | `AGENTS_READ` | `AGENTS_READ` |
+| `AGENTS_WRITE` / `api.agents.write` | `AGENTS_WRITE` | `AGENTS_WRITE` |
+| `RESPONSES_WRITE` / `api.responses.write` | `RESPONSES_WRITE` | `RESPONSES_WRITE` |
+| `MODEL_READ` / `api.model.read` | `MODEL_READ` | `MODEL_READ` |
+
+Nur der Key-Typ enthält Provider-Strings. Principal- und effektiver Typ sind lokale
+semantische Nachweise, **keine erfundenen OpenAI-Rollen-Strings**. Die kontrollierte
+Quelle muss die vollständige Principal-/Rollenunion unabhängig im dokumentierten
+Rollen-Namensraum lesen und explizit zuordnen, beim Modell-Read beispielsweise
+`model.read` zu `PrincipalPermission.MODEL_READ`. Es gibt keine automatische
+Entfernung oder Ergänzung eines `api.`-Präfixes und keine Annahme gleicher Namespaces.
+Fehlt ein dokumentierter und unabhängig authentifizierter Rollennachweis für eine
+benötigte Semantik, bleibt das Gate gesperrt. Keine neue Rollen- oder Scope-API
+wird aus diesen lokalen Typen abgeleitet.
+
+Jede Ebene muss ihrer eigenen exakten Erwartungsmenge entsprechen. Explizite
+Zuordnungsregeln berechnen Key- und Principal-Semantik getrennt; ihre Schnittmenge
+muss der attestierten effektiven Menge entsprechen. Erst nach allen Ebenenprüfungen
+und unabhängiger Authentifizierung werden die drei getrennten Ergebnisse in die
+bestehenden lokalen DT-017-Capabilities normalisiert. Namespace-Verwechslungen,
+fehlende, zusätzliche oder unbekannte Rechte sowie inkonsistente effektive Claims
+sperren, auch bei einer ansonsten gültigen Signatur. Auch authentifizierte Scope-
+Evidence erteilt keine Create-/Submit-Zustimmung.
 
 ### Normalisierung
 

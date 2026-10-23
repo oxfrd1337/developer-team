@@ -248,3 +248,13 @@ Account-Evidence auf Key-/Service-Account-/Owner-Ablauf, abgelaufene gecachte
 Observations, Ablauf während der abschließenden Handleprüfung sowie Canary-
 Handlewechsel vor oder während der externen Scope-Verifikation. Die separate
 Scope-Attestation gewährt weiterhin keine Transport- oder Live-Freigabe.
+
+
+DT-017A-Reviewblocker: `tests/test_scope_evidence.py` ergänzt 32 Regressionen für
+getrennte Key-/Principal-/effektive Typen und die Laufzeit-Trennung gepinnter
+Attestor-/Verifier-Identitäten. Die bisherigen Scope-Fixtures verwenden getrennte
+Source-/Verifier-Objekte. Namespace-Verwechslung, fehlende/zusätzliche/unbekannte
+Rechte, inkonsistente effektive Rechte, Self-Attestation, gleiche oder vertauschte
+Trust-Identitäten und Wechsel während externer Callbacks bleiben NO-GO. Der
+unabhängige korrekte synthetische Verifier erfüllt ausschließlich das Scope-Gate.
+Es erfolgen keine echten OpenAI-Aufrufe; real_submissions = 0, LIVE = NO-GO.

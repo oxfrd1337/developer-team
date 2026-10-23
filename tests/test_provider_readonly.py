@@ -23,10 +23,15 @@ from developer_team.adapters.provider_readonly_https import (
 )
 from developer_team.agents_acceptance import AcceptanceController, ReadOnlyVerifier
 from developer_team.provider_readonly import (
-    EXPECTED_SCOPES,
     AdminReadOnlyCollector,
     CanaryReadOnlyCollector,
     ProviderReadOnlyCollector,
+)
+from developer_team.scope_evidence import (
+    EXPECTED_KEY_PERMISSIONS,
+    EffectivePermission,
+    KeyPermission,
+    PrincipalPermission,
 )
 from tests.acceptance_support import SYNTHETIC_SECRET, SyntheticStore, credential_identity
 from tests.agents_api_support import NOW, binding
@@ -180,7 +185,9 @@ class CollectorTests(unittest.TestCase):
             )
             return True
 
-        self.h.collector._scope_verifier = Mock(verify=replace_handle)
+        self.h.collector._scope_verifier = Mock(
+            identity=self.h.scope_verifier.identity, verify=replace_handle
+        )
         self.assertIsNone(self.h.collector.read(self.h.bound, "credential_scope"))
         self.assertEqual(self.h.calls, [])
 
@@ -224,12 +231,12 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(report["live"], "NO-GO")
 
     def test_provider_claimed_scopes_cannot_supply_attestation(self):
-        self.h.key["scopes"] = sorted(EXPECTED_SCOPES)
+        self.h.key["scopes"] = sorted(p.value for p in EXPECTED_KEY_PERMISSIONS)
         self.h.collector._scope_source = None
         self.assert_blocked("credential_scope")
 
     def test_scope_attestation_each_identity_field_must_match(self):
-        original = self.h.authority.evidence
+        original = self.h.scope_source.evidence
         for field, value in (
             ("project_id", "foreign"),
             ("credential_ref", "foreign"),
@@ -239,13 +246,13 @@ class CollectorTests(unittest.TestCase):
             ("issued_at", NOW - 1),
             ("expires_at", NOW + 299),
         ):
-            self.h.authority.evidence = replace(
+            self.h.scope_source.evidence = replace(
                 original, identity=replace(original.identity, **{field: value})
             )
             self.assert_blocked("credential_scope")
 
     def test_scope_attestation_stale_future_expired_or_overlong_blocks(self):
-        original = self.h.authority.evidence
+        original = self.h.scope_source.evidence
         for changes in (
             {"observed_at": NOW - 301},
             {"observed_at": NOW + 1},
@@ -254,44 +261,55 @@ class CollectorTests(unittest.TestCase):
             {"observed_at": True},
             {"expires_at": True},
         ):
-            self.h.authority.evidence = replace(original, **changes)
+            self.h.scope_source.evidence = replace(original, **changes)
             self.assert_blocked("credential_scope")
 
     def test_scope_extra_or_missing_key_principal_effective_rights_blocks(self):
-        original = self.h.authority.evidence
-        for field in ("key_scopes", "principal_scopes", "effective_scopes"):
+        original = self.h.scope_source.evidence
+        for field, permission_type in (
+            ("key_scopes", KeyPermission),
+            ("principal_scopes", PrincipalPermission),
+            ("effective_scopes", EffectivePermission),
+        ):
+            expected = getattr(original, field)
             for scopes in (
-                EXPECTED_SCOPES | {"api.files.write"},
-                EXPECTED_SCOPES | {"admin"},
-                EXPECTED_SCOPES | {"all"},
-                EXPECTED_SCOPES - {"api.responses.write"},
-                list(EXPECTED_SCOPES),
+                expected | {permission_type.FILES_WRITE},
+                expected | {"admin"},
+                expected | {"all"},
+                expected - {permission_type.RESPONSES_WRITE},
+                list(expected),
             ):
-                self.h.authority.evidence = replace(original, **{field: scopes})
+                self.h.scope_source.evidence = replace(original, **{field: scopes})
                 self.assert_blocked("credential_scope")
 
     def test_scope_untrusted_json_false_signature_missing_verifier_blocks(self):
-        original = self.h.authority.evidence
+        original = self.h.scope_source.evidence
         for evidence in (
             asdict(original),
             replace(original, signature=b"forged"),
             replace(original, signature=b""),
-            replace(original, attestor_ref="private@example.invalid"),
+            replace(
+                original,
+                attestor_identity=replace(original.attestor_identity, subject_ref="foreign"),
+            ),
         ):
-            self.h.authority.evidence = evidence
+            self.h.scope_source.evidence = evidence
             self.assert_blocked("credential_scope")
-        self.h.authority.evidence = original
-        self.h.authority.accept = False
+        self.h.scope_source.evidence = original
+        self.h.scope_verifier.accept = False
         self.assert_blocked("credential_scope")
-        self.h.authority.accept = True
+        self.h.scope_verifier.accept = True
         self.h.collector._scope_verifier = None
         self.assert_blocked("credential_scope")
 
     def test_scope_verifier_faults_and_non_boolean_result_are_sanitized(self):
         for result in (1, "PASS", None):
-            self.h.collector._scope_verifier = Mock(verify=Mock(return_value=result))
+            self.h.collector._scope_verifier = Mock(
+                identity=self.h.scope_verifier.identity, verify=Mock(return_value=result)
+            )
             self.assert_blocked("credential_scope")
         self.h.collector._scope_verifier = Mock(
+            identity=self.h.scope_verifier.identity,
             verify=Mock(side_effect=ValueError(SYNTHETIC_SECRET))
         )
         self.assertNotIn(SYNTHETIC_SECRET, json.dumps(self.h.collector.report()))

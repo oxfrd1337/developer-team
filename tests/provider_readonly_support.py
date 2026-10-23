@@ -6,11 +6,17 @@ from unittest.mock import Mock
 
 from developer_team.adapters.provider_readonly_https import AdminCredentialIdentity
 from developer_team.provider_readonly import (
-    EXPECTED_SCOPES,
     AdminReadOnlyCollector,
     CanaryReadOnlyCollector,
     ProviderReadOnlyCollector,
+)
+from developer_team.scope_evidence import (
+    EXPECTED_EFFECTIVE_PERMISSIONS,
+    EXPECTED_KEY_PERMISSIONS,
+    EXPECTED_PRINCIPAL_PERMISSIONS,
+    ScopeAttestorIdentity,
     ScopeEvidence,
+    ScopeVerifierIdentity,
 )
 from tests.acceptance_support import SYNTHETIC_SECRET, SyntheticStore, credential_identity
 from tests.agents_api_support import NOW, binding
@@ -41,30 +47,44 @@ class AdminStore:
         return send("Bearer " + ADMIN_MARKER)
 
 
-class ScopeAuthority:
+def attestor_identity():
+    return ScopeAttestorIdentity("synthetic_attestor", "source_domain", "1" * 64)
+
+
+def verifier_identity():
+    return ScopeVerifierIdentity("synthetic_verifier", "verifier_domain", "2" * 64)
+
+
+class ScopeSource:
     def __init__(self):
+        self.identity = attestor_identity()
         self.evidence = ScopeEvidence(
             credential_identity(),
             NOW,
             NOW + 300,
-            EXPECTED_SCOPES,
-            EXPECTED_SCOPES,
-            EXPECTED_SCOPES,
-            "synthetic_attestor",
+            EXPECTED_KEY_PERMISSIONS,
+            EXPECTED_PRINCIPAL_PERMISSIONS,
+            EXPECTED_EFFECTIVE_PERMISSIONS,
+            self.identity,
+            verifier_identity(),
             b"synthetic-signature",
         )
-        self.accept = True
 
     def read_scope(self, bound, identity):
         return self.evidence
 
+
+class ScopeVerifier:
+    def __init__(self):
+        self.identity = verifier_identity()
+        self.accept = True
+        self.calls = 0
+
     def verify(self, evidence):
-        # Trusted synthetic seam, no production implementation or saved JSON verifier.
-        return (
-            self.accept
-            and evidence is self.evidence
-            and evidence.signature == b"synthetic-signature"
-        )
+        # Synthetic verifier has no source reference or read/issue capability.
+        # Production must authenticate ALL fields with independent trust roots.
+        self.calls += 1
+        return self.accept and evidence.signature == b"synthetic-signature"
 
 
 class Connection:
@@ -182,14 +202,17 @@ class Harness:
             now=lambda: self.clock,
             connection_factory=lambda timeout: self.factory("canary"),
         )
-        self.authority = ScopeAuthority()
+        self.scope_source = ScopeSource()
+        self.scope_verifier = ScopeVerifier()
         self.collector = ProviderReadOnlyCollector(
             b,
             c,
             admin=self.admin,
             canary=self.canary,
-            scope_source=self.authority,
-            scope_verifier=self.authority,
+            scope_source=self.scope_source,
+            scope_verifier=self.scope_verifier,
+            scope_attestor_identity=attestor_identity(),
+            scope_verifier_identity=verifier_identity(),
             now=lambda: self.clock,
         )
 

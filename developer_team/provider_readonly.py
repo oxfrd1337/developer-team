@@ -11,20 +11,15 @@ import time
 from dataclasses import dataclass
 
 from .adapters.agents_api_contracts import (
-    MINIMAL_CAPABILITIES,
     AgentsAPIError,
     bounded_int,
     safe_ref,
     sha256,
 )
-from .adapters.agents_credentials import CredentialIdentity, require_identity
+from .adapters.agents_credentials import require_identity
 from .adapters.provider_readonly_https import AdminReadOnlyHTTPS, CanaryReadOnlyHTTPS
 from .agents_acceptance import ACCOUNT_CHECKS, Observation, ReadOnlyVerifier
-
-# Official RBAC: api.model.read (singular), not api.models.read or model.request.
-EXPECTED_SCOPES = frozenset(
-    {"api.agents.read", "api.agents.write", "api.responses.write", "api.model.read"}
-)
+from .scope_evidence import ScopeEvidence, validate_scope_subjects
 
 
 def _require(condition):
@@ -81,41 +76,6 @@ def _not_expired(record, now):
     if "owner_project_access" in record:
         _require(record["owner_project_access"] == "active")
     return expiry if expiry is not None else now + 300
-
-
-@dataclass(frozen=True, slots=True, repr=False)
-class ScopeEvidence:
-    """External account/dashboard evidence, independently verified, never self-attested.
-
-    signature is opaque authentication data for a trusted verifier. No boolean on
-    this object can assert authenticity. Provision the verifier outside the agent
-    and stored reports; it must authenticate the complete object and scope union.
-    """
-
-    identity: CredentialIdentity
-    observed_at: int
-    expires_at: int
-    key_scopes: frozenset[str]
-    principal_scopes: frozenset[str]
-    effective_scopes: frozenset[str]
-    attestor_ref: str
-    signature: bytes
-
-    def validate(self, binding, identity, now, verifier):
-        require_identity(identity, binding, now)
-        _require(type(self.identity) is CredentialIdentity and self.identity == identity)
-        _require(bounded_int(self.observed_at, max(0, now - 300), now))
-        _require(bounded_int(self.expires_at, now + 1, self.observed_at + 300))
-        _require(safe_ref(self.attestor_ref))
-        _require(type(self.signature) is bytes and 1 <= len(self.signature) <= 4096)
-        for scopes in (self.key_scopes, self.principal_scopes, self.effective_scopes):
-            _require(type(scopes) is frozenset and scopes == EXPECTED_SCOPES)
-        verified = False
-        try:
-            verified = verifier.verify(self) is True
-        except Exception:
-            verified = False
-        _require(verified)
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -266,8 +226,9 @@ class CanaryReadOnlyCollector:
 class ProviderReadOnlyCollector:
     """Acceptance adapter for four provider-backed gates; all others remain absent.
 
-    Trusted scope_source.read_scope(binding, identity) plus a separate verifier is
-    required. Neither GET success nor an untrusted JSON/Observation grants scopes.
+    Trusted scope_source.read_scope(binding, identity), an independent verifier
+    and controller-provisioned role-specific identity pins are required.
+    Neither GET success nor an untrusted JSON/Observation grants scopes.
     No fallback to another account collector for these four checks.
     """
 
@@ -280,12 +241,16 @@ class ProviderReadOnlyCollector:
         canary=None,
         scope_source=None,
         scope_verifier=None,
+        scope_attestor_identity=None,
+        scope_verifier_identity=None,
         now=time.time,
     ):
         binding.validate()
         self._binding, self._identity, self._now = binding, identity, now
         self._admin, self._canary = admin, canary
         self._scope_source, self._scope_verifier = scope_source, scope_verifier
+        self._attestor_pin = scope_attestor_identity
+        self._verifier_pin = scope_verifier_identity
 
     def _separation(self):
         if self._admin is None or self._canary is None:
@@ -321,18 +286,19 @@ class ProviderReadOnlyCollector:
                 facts = self._canary.agent()
             elif check == "credential_scope":
                 self._validate_canary_handle(binding, c)
-                evidence = self._scope_source.read_scope(binding, c)
+                source, verifier = self._scope_source, self._scope_verifier
+                attestor_pin, verifier_pin = self._attestor_pin, self._verifier_pin
+                validate_scope_subjects(source, verifier, attestor_pin, verifier_pin)
+                evidence = source.read_scope(binding, c)
                 _require(type(evidence) is ScopeEvidence)
-                evidence.validate(binding, c, int(self._now()), self._scope_verifier)
+                facts = evidence.validate(
+                    binding, c, int(self._now()), source, verifier, attestor_pin, verifier_pin
+                )
+                _require(self._scope_source is source and self._scope_verifier is verifier)
+                _require(self._attestor_pin == attestor_pin and self._verifier_pin == verifier_pin)
                 self._validate_canary_handle(binding, c)
                 observed_at, expires_at = evidence.observed_at, min(expires_at, evidence.expires_at)
-                facts = {
-                    "credential_identity_digest": c.digest,
-                    "key_capabilities": sorted(MINIMAL_CAPABILITIES),
-                    "principal_capabilities": sorted(MINIMAL_CAPABILITIES),
-                    "effective_capabilities": sorted(MINIMAL_CAPABILITIES),
-                    "additional_permissions": [],
-                }
+
             else:
                 return None
             after = int(self._now())
