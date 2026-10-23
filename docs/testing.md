@@ -207,3 +207,16 @@ Der produktive Gateway akzeptiert keinen Runner und verweigert bedingungslos;
 Lifecycle-Fixtures sind davon getrennt. Die feste Rehearsalantwort bleibt selbst bei
 gesetzten Runnerattributen modellfrei. Bestehende Vertragstests wurden auf die
 separate Test-Fixture umgestellt, ihre Prüfbedingungen nicht abgeschwächt.
+
+
+## DT-017
+
+`tests/test_agents_acceptance.py` und `tests/test_agents_https.py` prüfen den
+kontrollierten Controller, alle Pre-Live-Gates, getrennte frische Operator-Challenges,
+Drift, Unknown-Recovery, begrenztes Cleanup und den echten HTTPS-Code ausschließlich
+mit injizierten Wire-Verbindungen. Account, Secretmaterial und Providerantworten sind
+synthetisch. DNS/TLS/Connection/Timeout/401/403/429/5xx/Redirect und Größenlimits werden
+ohne echte Credentials oder Provider-POST geprüft. [Vertrag und Live-Blocker](dt-017-controlled-acceptance.md).
+
+**real_submissions = 0 · LIVE = NO-GO.**
+**OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
