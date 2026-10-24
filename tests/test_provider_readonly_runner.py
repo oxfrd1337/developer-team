@@ -231,6 +231,58 @@ class RunnerTests(unittest.TestCase):
         )
         self.assertEqual(self.h.connections, [])
 
+    def test_exact_0600_required_for_both_roles_even_with_matching_pins(self):
+        for index, role in enumerate(("admin", "canary")):
+            for mode in (0o400, 0o500, 0o700, 0o640, 0o660, 0o644, 0o1600, 0o4600):
+                with self.subTest(role=role, mode=oct(mode)):
+                    os.fchmod(self.files[index].fileno(), mode)
+                    identity = self.admin if index == 0 else self.h.identity
+                    handle = self.handle(index, identity)
+                    with patch("os.pread", side_effect=AssertionError("read forbidden")) as read:
+                        with self.assertRaises(AgentsAPIError):
+                            handle.validate(identity)
+                        self.assertEqual(
+                            self.run_runner(**{role + "_fd": handle})["outcome"], "BLOCKED"
+                        )
+                        read.assert_not_called()
+                    self.assertEqual(self.h.connections, [])
+                os.fchmod(self.files[index].fileno(), 0o600)
+                self.kw[role + "_fd"] = self.handle(index, identity)
+
+    def test_runner_final_account_expiry_still_enforced_and_broker_consistent(self):
+        from developer_team import provider_readonly_prepare as broker
+
+        original = Connection.getresponse
+        start = self.h.clock
+        self.h.account["expires_at"] = start + 2
+        for elapsed in (1, 2, 3):
+            self.h.clock = start
+            self.h.calls.clear()
+
+            def response(conn, elapsed=elapsed):
+                raw = original(conn)
+                if conn.path == f"/v1/agents/{self.h.bound.agent_id}":
+                    self.h.clock = start + elapsed
+                return raw
+
+            with self.subTest(elapsed=elapsed), patch.object(Connection, "getresponse", response):
+                report = self.run_runner()
+                self.assertEqual(broker._sanitize(json.dumps(report)), report)
+                self.assertEqual(report["outcome"], "COLLECTED")
+                self.assertEqual(report["provider_observations"], "SOME_VALID")
+                self.assertEqual(
+                    report["checks"]["account_project_binding"],
+                    "PASS" if elapsed < 2 else "MISSING_OR_INVALID",
+                )
+                self.assertEqual(
+                    report["provider_diagnostics"]["account_project_binding"],
+                    {
+                        "stage": "FINAL_VALIDATION",
+                        "code": "PASS" if elapsed < 2 else "OBSERVATION_INVALID",
+                    },
+                )
+                self.assertEqual(len(self.h.calls), 6)
+
     def test_nonregular_fd_blocked(self):
         read, write = os.pipe()
         self.addCleanup(os.close, read)

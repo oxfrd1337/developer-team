@@ -176,7 +176,10 @@ class DiagnosticsTests(unittest.TestCase):
             for error, code in (
                 (socket.gaierror(SYNTHETIC_SECRET), "DNS_FAILURE"),
                 (ssl.SSLError(ADMIN_MARKER), "TLS_OR_PROXY_FAILURE"),
-                (http.client.HTTPException(SYNTHETIC_SECRET), "TLS_OR_PROXY_FAILURE"),
+                (http.client.HTTPException(SYNTHETIC_SECRET), "TRANSPORT_FAILURE"),
+                (http.client.BadStatusLine(ADMIN_MARKER), "TRANSPORT_FAILURE"),
+                (http.client.IncompleteRead(SYNTHETIC_SECRET.encode()), "TRANSPORT_FAILURE"),
+                (http.client.RemoteDisconnected(ADMIN_MARKER), "TRANSPORT_FAILURE"),
                 (TimeoutError(SYNTHETIC_SECRET), "TIMEOUT"),
                 (ConnectionError(ADMIN_MARKER), "TRANSPORT_FAILURE"),
                 (AgentsAPIError("unsupported_proxy_configuration"), "TLS_OR_PROXY_FAILURE"),
@@ -203,6 +206,10 @@ class DiagnosticsTests(unittest.TestCase):
         for error, code in (
             (socket.gaierror(SYNTHETIC_SECRET), "DNS_FAILURE"),
             (ssl.SSLError(ADMIN_MARKER), "TLS_OR_PROXY_FAILURE"),
+            (http.client.HTTPException(SYNTHETIC_SECRET), "TRANSPORT_FAILURE"),
+            (http.client.BadStatusLine(ADMIN_MARKER), "TRANSPORT_FAILURE"),
+            (http.client.IncompleteRead(SYNTHETIC_SECRET.encode()), "TRANSPORT_FAILURE"),
+            (http.client.RemoteDisconnected(ADMIN_MARKER), "TRANSPORT_FAILURE"),
             (TimeoutError(SYNTHETIC_SECRET), "TIMEOUT"),
         ):
             self.h = Harness()
@@ -268,6 +275,43 @@ class DiagnosticsTests(unittest.TestCase):
                 report["provider_diagnostics"][gate],
                 {"stage": "FINAL_VALIDATION", "code": "OBSERVATION_INVALID"},
             )
+
+    def test_direct_report_revalidates_account_at_completion_without_extra_gets(self):
+        original = Connection.getresponse
+        for elapsed in (1, 2, 3):
+            self.h = Harness()
+            self.h.collector._scope_source = None
+            start = self.h.clock
+            self.h.account["expires_at"] = start + 2
+
+            def response(conn, elapsed=elapsed, start=start):
+                raw = original(conn)
+                if conn.path == f"/v1/agents/{self.h.bound.agent_id}":
+                    self.h.clock = start + elapsed
+                return raw
+
+            with self.subTest(elapsed=elapsed), patch.object(Connection, "getresponse", response):
+                report = self.report()
+                valid = elapsed < 2
+                self.assertEqual(
+                    report["checks"]["account_project_binding"], "PASS" if valid else runner.MISSING
+                )
+                self.assertEqual(
+                    report["provider_diagnostics"]["account_project_binding"],
+                    {
+                        "stage": "FINAL_VALIDATION",
+                        "code": "PASS" if valid else "OBSERVATION_INVALID",
+                    },
+                )
+                for gate in ("spend_controls", "agent_configuration"):
+                    self.assertEqual(report["checks"][gate], "PASS")
+                self.assertEqual(
+                    self.h.calls,
+                    [
+                        ("admin" if i < 4 else "canary", "GET", path)
+                        for i, (_, _, path) in enumerate(self.operations())
+                    ],
+                )
 
     def test_role_swaps_remain_blocked_before_any_connection(self):
         h = self.h

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import http.client
 import math
 import os
 import re
@@ -143,7 +142,7 @@ class _ReadOnlyHTTPS(HardenedHTTPS):
         # Classify by type only, never exception text (which can contain secrets).
         if isinstance(error, TimeoutError):
             status = -1
-        elif isinstance(error, (ssl.SSLError, http.client.HTTPException)):
+        elif isinstance(error, ssl.SSLError):
             status = -2
         elif isinstance(error, socket.gaierror):
             status = -3
@@ -154,6 +153,8 @@ class _ReadOnlyHTTPS(HardenedHTTPS):
         elif type(error) is AgentsAPIError and error.args == ("unsupported_proxy_configuration",):
             status = -2
         else:
+            # HTTPException (including protocol errors/disconnects) proves
+            # neither TLS nor proxy failure; retain the neutral transport code.
             status = -5
         return WireResponse(status)
 

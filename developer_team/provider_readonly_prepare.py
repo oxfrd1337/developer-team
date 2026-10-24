@@ -189,10 +189,16 @@ def _sanitize(raw):
         type(value) is not dict
         or set(value) != set(expected)
         or value["mode"] != "READ_ONLY"
+        or type(value["outcome"]) is not str
         or value["outcome"] not in {"BLOCKED", "COLLECTED"}
         or type(value["checks"]) is not dict
         or set(value["checks"]) != set(runner.GATES)
-        or any(v not in {"PASS", runner.MISSING} for v in value["checks"].values())
+        or any(
+            type(status) is not str
+            or status not in {"PASS", runner.MISSING}
+            or (gate not in PROVIDER_GATES and status != runner.MISSING)
+            for gate, status in value["checks"].items()
+        )
         or value["LIVE"] != "NO-GO"
         or type(value["real_submissions"]) is not int
         or value["real_submissions"] != 0
@@ -200,9 +206,12 @@ def _sanitize(raw):
         or value["validation"] != expected["validation"]
         or type(value["schema_version"]) is not int
         or value["schema_version"] != 2
+        or type(value["provider_observations"]) is not str
         or value["provider_observations"] not in {"NONE_VALID", "SOME_VALID"}
     ):
         raise AgentsAPIError("invalid_runner_report")
+    # The official CLI has no external scope verifier or evidence for the other
+    # nine gates. Optional trusted Python scope integration is a separate path.
     # Reconstruct instead of forwarding any arbitrary runner output.
     expected["outcome"] = value["outcome"]
     expected["checks"] = {key: value["checks"][key] for key in runner.GATES}

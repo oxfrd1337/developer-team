@@ -21,8 +21,9 @@ als Manifest unterstützt. Fehler geben keine Argumente oder Exceptiontexte aus.
 Ein vertrauenswürdiger externer lokaler Credential-Broker muss **vor dem Start**
 zwei getrennte, private reguläre Dateien ausschließlich lesend öffnen und die FDs
 vererben. Der Runner öffnet selbst keine Credential-Datei. Beide Dateien müssen
-dem effektiven Benutzer gehören, dürfen keine Gruppen-/Fremdrechte haben und
-enthalten jeweils 1–512 ASCII-Zeichen gemäß dem bestehenden FDSecretStore-Vertrag.
+dem effektiven Benutzer gehören und seit R1 (#49) exakt den Modus `0600` haben;
+auch `0400`, `0700` und Sonderbits sind gesperrt. Der Runner ändert keine Rechte.
+Sie enthalten jeweils 1–512 ASCII-Zeichen gemäß dem bestehenden FDSecretStore-Vertrag.
 Die Secrets dürfen weder in Chat/argv/stdin/env/JSON noch in Logs gelangen.
 Es gibt keine Discovery und keine API-Key-Erstellung, Rotation oder Änderung.
 
@@ -119,6 +120,9 @@ unabhängige Realtransport-Attestation, dauerhaftes Journal, exklusiver
 Single-Canary-Grant und jeweils frische Create-/Submit-Operatorfreigabe.
 Der CLI fehlt außerdem absichtlich eine Scope-Adapter-Ladefunktion; reale
 Scope-Evidence erfordert die vertrauenswürdige Python-Integration.
+Der offizielle Broker-Sanitizer akzeptiert daher nur PASS für die drei Provider-Gates
+und verwirft Scope-PASS sowie jeden anderen der neun unbelegten Gate-PASS-Werte.
+Die optionale Python-Integration ist kein Scope-Nachweis für den CLI-Pfad.
 Es wurden für DT-017B keine echten Provider-Reads oder Mutationen ausgeführt.
 Ein unabhängiger Review und manueller Merge bleiben erforderlich.
 Der bestehende Namespace-/Bubblewrap-Skip ist weiterhin kein Isolationsnachweis.

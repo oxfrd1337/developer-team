@@ -388,7 +388,15 @@ class ProviderReadOnlyCollector:
         return sanitize_diagnostics(self._diagnostics)
 
     def report(self):
-        checks, _ = ReadOnlyVerifier(self).inspect(self._binding, int(self._now()), self._identity)
+        checks, observations = ReadOnlyVerifier(self).inspect(
+            self._binding, int(self._now()), self._identity
+        )
+        # Revalidate earlier observations at completion, without repeating GETs
+        # or relaxing the verifier's binding, identity or start-time checks.
+        final = int(self._now())
+        for gate, observation in observations.items():
+            if not final - 300 <= observation.observed_at <= final < observation.expires_at:
+                checks[gate] = "MISSING_OR_INVALID"
         diagnostics = self.diagnostics()
         for gate in PROVIDER_GATES:
             if checks[gate] != "PASS" and diagnostics[gate]["code"] == "PASS":

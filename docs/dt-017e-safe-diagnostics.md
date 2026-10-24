@@ -1,6 +1,6 @@
 # DT-017E: sichere Diagnose fehlender Provider-Evidence
 
-Issue #44, Basis `e230ddb42fcfad624221a6ed31808b03c7ca6816`.
+Issues #44 und #49 (R1), Basis `e230ddb42fcfad624221a6ed31808b03c7ca6816`.
 Der historische all-MISSING-Bericht beweist keine konkrete Ursache. Erst ein
 separat autorisierter Erhebungsversuch mit dieser Diagnoseversion kann sichere
 Fehlerklassen und die betroffene zugelassene Operation unterscheiden.
@@ -11,7 +11,8 @@ Das Runner-/Broker-Reportschema wechselt von **1 auf 2**: Die zusätzlichen fest
 Felder `provider_diagnostics` und `provider_observations` müssen atomar durch den
 Broker-Sanitizer geprüft werden. Version 1 wird abgelehnt; unbekannte Felder,
 Werte, falsche Typen und widersprüchliche PASS-/Zählerangaben werden gesperrt.
-Das Eingabemanifest und die Rollen-/FD-/Release-Verträge bleiben unverändert.
+Das Eingabemanifest und die Rollen-/Release-Bindungen bleiben unverändert.
+R1 vereinheitlicht den Dateimodus an Broker und direktem Runner auf exakt `0600`.
 
 `provider_diagnostics` enthält exakt drei Gates. Jedes enthält ausschließlich
 `stage` und `code` aus dem geschlossenen Vokabular. Bei einem Fehler stoppt das
@@ -41,11 +42,11 @@ weniger als sechs sein. Die Diagnose enthält keine Pfade oder Referenzen.
 | `HTTP_5XX` | HTTP-Status 500–599 |
 | `HTTP_OTHER` | Anderer Status außer 200; Body verworfen |
 | `REDIRECT_BLOCKED` | HTTP-Status 300–399; kein Follow, kein Body-/Location-Read |
-| `TLS_OR_PROXY_FAILURE` | TLS-/HTTP-Protokollfehler oder ungültige Proxykonfiguration; keine Ursachenauflösung aus Fehlertext |
+| `TLS_OR_PROXY_FAILURE` | `ssl.SSLError` oder exakt bekannte interne ungültige Proxykonfiguration; keine Ursachenauflösung aus Fehlertext |
 | `DNS_FAILURE` | Resolverfehler vom Typ `socket.gaierror` |
 | `TIMEOUT` | Transporttimeout oder Connect-/Read-/Gesamtfrist überschritten |
 | `RESPONSE_TOO_LARGE` | Bodygrenze (maximal 65536 Bytes) oder Headergrenze überschritten |
-| `TRANSPORT_FAILURE` | Sonstiger sicher klassifizierter Wire-Fehler, einschließlich nicht genauer einordenbarer Proxy-/Verbindungsabbrüche |
+| `TRANSPORT_FAILURE` | Allgemeine HTTP-Protokollfehler (`http.client.HTTPException`, einschließlich `BadStatusLine`, `IncompleteRead`, `RemoteDisconnected`) und sonstige nicht genauer einordenbare Wire-/Verbindungsabbrüche; kein Beweis eines TLS-/Proxyfehlers |
 | `OBSERVATION_INVALID` | Collector erfolgreich, aber Observation vom bestehenden Verifier oder abschließender Frischeprüfung verworfen; kein Rückschluss auf Authentifizierung |
 | `READ_UNAVAILABLE` | Kein verwertbares Read-Ergebnis, etwa Secret-Store-/Handle-/Abschlussfehler; keine sichere feinere Ursachenbestimmung |
 | `SCHEMA_MISMATCH` | JSON-/Contractprüfung scheitert, einschließlich doppelter Keys, Nichtfinite-Werte, falscher Typen und unbekannter Agentfelder |
@@ -62,9 +63,27 @@ wird aus den abschließend gültigen Gate-Ergebnissen berechnet, niemals aus HTT
 Bei einem globalen Sicherheitsfehler bleibt `outcome=BLOCKED`, sämtliche Checks
 fehlen und die Diagnosen stehen auf `NOT_ATTEMPTED`.
 
-`credential_scope` bleibt ohne unabhängigen externen Verifier
-`MISSING_OR_INVALID`, auch bei sechs erfolgreichen GETs. Alle anderen bisher
-fehlenden Gates bleiben unverändert. Kein Diagnosecode ist Scope-, Budget-,
+Der direkte `ProviderReadOnlyCollector.report()` prüft die bereits vom Verifier
+akzeptierten Observations erneut gegen die frische Abschlusszeit, ohne weitere
+GETs. Es gilt `observed_at <= final < expires_at` und höchstens 300 Sekunden Alter.
+Genau bei Ablauf und danach wird das Gate `MISSING_OR_INVALID` mit Diagnose
+`FINAL_VALIDATION / OBSERVATION_INVALID`. Die zusätzliche Frischeprüfung des
+offiziellen Runners bleibt erhalten; eine Startzeit-/Bindungsablehnung wird nicht
+nachträglich zu PASS.
+
+Im **offiziellen CLI-/Broker-Report** dürfen ausschließlich die drei oben genannten
+Provider-Gates PASS sein, jeweils konsistent mit Verifierergebnis, Diagnose-PASS
+an `FINAL_VALIDATION` und `provider_observations`. Der Sanitizer verwirft PASS für
+jedes der neun übrigen Gates: `provider_contract_current`, `credential_scope`,
+`secret_store`, `environment_configuration`, `single_canary_grant`, `real_transport`,
+`durable_journal`, `fresh_create_approval`, `fresh_submit_approval`. Das gilt auch
+bei ansonsten gültigen Providerobservations. Alle neun bleiben zwingend
+`MISSING_OR_INVALID`; Booleanwerte sind keine Status-/Schema-/Zählerwerte.
+
+Die optionale **vertrauenswürdige Python-Scope-Integration** mit unabhängigem
+externem Verifier bleibt separat bestehen. Ein solcher Python-Report mit Scope-PASS
+ist kein zulässiger offizieller Broker-Report; weder JSON noch sechs erfolgreiche
+GETs konstruieren Scope-Evidence. Kein Diagnosecode ist Scope-, Budget-,
 Grant-, Review- oder Release-Evidence. Keine Session-Create/Submit/Cancel-, Key-,
 Spend- oder Agent-Mutation wird hinzugefügt.
 
@@ -94,6 +113,12 @@ kopieren, keine Secretwerte in Shell, CLI oder Env eintragen. Keine alternativen
 Diagnoseskripte, keine manuellen zusätzlichen Providerrequests. Bei unbekannter
 Rollenzuordnung anhalten. Der Helper prüft Release und Rollenbindung vor Zugriff.
 CI-/Offline-Marker und Secret-Env-Namen sperren weiterhin vor Secret-Auswahl.
+Auch direkt übergebene `ExternalFD`-Handles müssen exakt `0600` haben;
+`0400`, ausführbare Eigentümermodi wie `0700` und Sonderbits werden abgelehnt,
+selbst bei passenden externen Identitäts-/Dateipins. Die Prüfung ändert keine
+Dateirechte und liest keine Secretbytes. Keine echten Schlüsseldateien für einen
+Test umstellen. Der separate externe **Release-Pin** behält seinen eigenen
+unveränderten Modusvertrag `0400`.
 
 Exitcode **2** und `LIVE=NO-GO` sind immer beabsichtigt. stdout enthält nur den
 sanitisierten Report; keine IDs, URLs, Header, Bodies, Fehlertexte, Hashes von
@@ -143,6 +168,11 @@ Einträge, Agentendrift, Budget, Rollenwechsel, Diagnose-Reset, geschlossene
 Reportfelder und Broker-Konsistenz werden zusätzlich geprüft. Bestehende Tests
 für unveränderliche/vertauschte/ersetzte FDs, echte Zeitgrenzen, Releaseintegrität,
 Scope-Self-Attestation und Live-Sperren bleiben verpflichtend.
+R1 ergänzt neun getrennte Gatefälschungstests, alle acht Provider-PASS-Teilmengen,
+BLOCKED-Invarianten, boolesche Verwechslungen, unerwartete Typen und doppelte
+JSON-Schlüssel. Ablaufgrenzen und direkte FD-Modi werden mit synthetischer Uhr
+beziehungsweise wegwerfbaren künstlichen Dateien geprüft.
+[R1-Fix-Nachweis und erneute Abnahme](dt-017e-r1-validation.md).
 
 Die Python-3.11–3.13-CI verwendet weiterhin ausschließlich synthetische Fixtures
 und `DT_PROVIDER_OFFLINE=1`. Die Formatdiagnose läuft auch nach einem Lintfehler,

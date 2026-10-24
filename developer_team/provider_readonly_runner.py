@@ -60,7 +60,7 @@ class ExternalFD:
                     FDSecretStore._file_identity(info) == self.snapshot
                     and stat.S_ISREG(info.st_mode)
                     and info.st_uid == os.geteuid()
-                    and not info.st_mode & 0o077
+                    and stat.S_IMODE(info.st_mode) == 0o600
                     and 1 <= info.st_size <= 512
                     and fcntl.fcntl(self.descriptor, fcntl.F_GETFL) & os.O_ACCMODE == os.O_RDONLY
                 )

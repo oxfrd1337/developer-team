@@ -1,5 +1,14 @@
 # DT-017E: Test-, QA- und Security-Bericht
 
+**Historischer Entwicklungsstand vor R1:** Die nachfolgenden 725-Tests-Angaben
+gehören zu HEAD `749047443a9db533785073ff990ab21336e4a98e`. Die technischen
+Reviews #47/#48 bewerteten diesen Stand wegen QA-01 und QA-02/Security F1 als
+**FAIL**, mit zusätzlichen P3-Befunden F2/F3. Sie sind keine unabhängige Freigabe;
+die geforderte Trennung der GitHub-Revieweridentitäten war **UNSUPPORTED**.
+Aktuelle Korrekturen, Regressionen und erneuter Prüfauftrag:
+[R1 zu Issue #49](dt-017e-r1-validation.md). Die alten Aussagen über unveränderte
+FD-Prüfung gelten nicht für die gezielte `0600`-Korrektur in R1.
+
 Basis: `e230ddb42fcfad624221a6ed31808b03c7ca6816` (`main`, über GitHub geprüft).
 Branch: `dt-017e-safe-readonly-diagnostics`. Auftrag: Issue #44.
 Dieser Bericht beschreibt Entwicklungsprüfung, keine unabhängige Release-Freigabe.
