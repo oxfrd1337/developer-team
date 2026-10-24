@@ -3,9 +3,11 @@
 ## DT-017C: lokaler Prepare-/Broker-Helper
 
 [Mac-Ablauf und sichere Rollenbindung](docs/dt-017c-local-readonly-broker.md):
-`python3 -m developer_team.provider_readonly_prepare` zeigt fehlende Bindungsfelder
+`python3 -B -m developer_team.provider_readonly_prepare` zeigt fehlende Bindungsfelder
 ohne Datei- oder Netzwerkzugriff. Nur `--execute-real-readonly` erlaubt die lokale
-Dateiauswahl und den unveraenderten DT-017B-GET-Lauf. Keine Agent-Erstellung.
+Dateiauswahl und den unveraenderten DT-017B-GET-Lauf. Dafuer sind ein sauberer
+exakt freigegebener Release-Checkout und ein unabhaengig bereitgestellter externer
+Release-Pin erforderlich. Keine Agent-Erstellung.
 **real_submissions = 0, LIVE = NO-GO, live_authorized = false.**
 **OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
 

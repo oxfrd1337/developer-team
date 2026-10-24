@@ -21,8 +21,8 @@ from .adapters.agents_api_contracts import AgentsAPIError, CanaryBinding, safe_r
 from .adapters.agents_credentials import CredentialIdentity
 from .adapters.agents_https import FDSecretStore
 from .adapters.provider_readonly_https import AdminCredentialIdentity
+from .provider_readonly_release import verified_snapshot, verify_release
 
-BASE = "abb3eed41c8e056c930ae3f46bf7affad741afae"
 RUNNER_SHA256 = "41136330bdc37d0695d2ad262cd13e1ba7b0e88874949daf862847673d8dbd6e"
 FIELDS = (
     "project_id",
@@ -97,17 +97,7 @@ def _check_checkout():
     ).hexdigest()
     if digest != RUNNER_SHA256:
         raise AgentsAPIError("runner_changed")
-    result = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", BASE, "HEAD"],
-        cwd=root,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        timeout=5,
-        check=False,
-    )
-    if result.returncode:
-        raise AgentsAPIError("base_missing")
+    verify_release(root)
     return root
 
 
@@ -216,11 +206,24 @@ def _sanitize(raw):
 
 
 def _invoke(root, manifest, admin_fd, canary_fd):
+    with verified_snapshot(root) as snapshot:
+        return _invoke_snapshot(snapshot, manifest, admin_fd, canary_fd)
+
+
+def _invoke_snapshot(root, manifest, admin_fd, canary_fd):
+    bootstrap = (
+        "import runpy,sys;sys.path.insert(0,sys.argv.pop(1));"
+        "runpy.run_module('developer_team.provider_readonly_runner',run_name='__main__')"
+    )
     completed = subprocess.run(
         [
             sys.executable,
-            "-m",
-            "developer_team.provider_readonly_runner",
+            "-I",
+            "-S",
+            "-B",
+            "-c",
+            bootstrap,
+            str(root),
             "--manifest",
             str(manifest),
             "--admin-fd",
@@ -252,9 +255,11 @@ def _execute(values, bound, admin_fd, canary_fd, tty):
         ):
             if supplied is None:
                 path = _read_path(tty, role, ref)
+                _check_checkout()
                 handles.append(stack.enter_context(_open_private(path)))
             else:
                 # Duplicate only after explicit consent; retain caller ownership.
+                _check_checkout()
                 original_pin = _checked_fd(supplied)
                 duplicate = os.dup(supplied)
                 stack.callback(os.close, duplicate)
@@ -327,7 +332,7 @@ def prepare(argv=None):
     with contextlib.ExitStack() as stack:
         tty = None
         if missing or args.admin_fd is None or args.canary_fd is None:
-            # Never read redirected stdin. getpass must have a genuine local TTY.
+            # Never read redirected stdin; only a genuine local TTY is accepted.
             try:
                 raw_tty = stack.enter_context(open("/dev/tty", "rb+", buffering=0))
                 tty = stack.enter_context(
@@ -354,6 +359,13 @@ def prepare(argv=None):
 def main(argv=None):
     try:
         report = prepare(argv)
+    except AgentsAPIError as error:
+        reason = (
+            "release_integrity_required"
+            if error.args == ("release_integrity_required",)
+            else "local_prepare_blocked"
+        )
+        report = _halt(reason)
     except (Exception, KeyboardInterrupt):
         report = _halt("local_prepare_blocked")
     print(json.dumps(report, sort_keys=True, separators=(",", ":")))

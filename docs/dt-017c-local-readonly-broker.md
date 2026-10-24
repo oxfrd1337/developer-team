@@ -3,8 +3,9 @@
 Basis: `abb3eed41c8e056c930ae3f46bf7affad741afae` (DT-017B).
 Der Helper ersetzt das manuelle Erstellen von FD-Pins, Identitaeten und Manifest.
 Der bestehende DT-017B-Runner bleibt bytegleich. Der Helper prueft dessen SHA-256
-und die Git-Abstammung vor jedem Erhebungsversuch. Ein installierter Wheel ohne
-den passenden Git-Checkout reicht fuer die reale Erhebung nicht aus.
+und die exakte unabhaengig gepinnte Release-Identitaet. Abstammung von einer Basis
+genuegt nicht. Ein installierter Wheel ohne passenden sauberen Git-Checkout und
+externen Release-Pin reicht fuer die reale Erhebung nicht aus.
 
 ## Mac-Ablauf
 
@@ -19,7 +20,7 @@ Secret-Umgebungsvariablen blockieren die Erhebung.
 1. Terminal im Repository-Ordner oeffnen. Sicherer Standardaufruf:
 
    ```sh
-   python3 -m developer_team.provider_readonly_prepare
+   python3 -B -m developer_team.provider_readonly_prepare
    ```
 
    Er zeigt nur fehlende nicht geheime Feldnamen. Kein Dateizugriff, kein FD,
@@ -32,10 +33,17 @@ Secret-Umgebungsvariablen blockieren die Erhebung.
    DT-017-Plan. Keine Werte raten. Das Budgetfeld aendert keinen Spend-Wert.
    Ohne Saved Agent ist HALT erforderlich; hier wird keiner erstellt.
 
-3. Nur fuer die ausdruecklich gewuenschte reale Read-only-Erhebung:
+3. Der unabhaengige Reviewer muss vorher den unten beschriebenen nicht geheimen
+   Release-Pin ausserhalb des Checkouts bereitstellen. Dieser PR und gruene CI
+   stellen keine Release-Freigabe dar. Der Helper erstellt oder erneuert keinen Pin.
+   Fuer die Erhebung einen separaten sauberen Release-Checkout ohne Bytecode-Caches,
+   Build-, Coverage- oder sonstige untracked/ignored-Dateien verwenden. Python mit
+   `-B` starten, damit keine neuen Bytecode-Caches geschrieben werden.
+
+4. Nur fuer die ausdruecklich gewuenschte reale Read-only-Erhebung:
 
    ```sh
-   python3 -m developer_team.provider_readonly_prepare --execute-real-readonly
+   python3 -B -m developer_team.provider_readonly_prepare --execute-real-readonly
    ```
 
    Der lokale Terminaldialog fragt die nicht geheimen Felder in dieser Reihenfolge
@@ -59,6 +67,50 @@ Die urspruenglichen FDs bleiben Eigentum des Aufrufers; eigene Duplikate werden
 geschlossen. Auch diese Variante benoetigt den expliziten Schalter.
 
 ## Vertrauensgrenze und Bereinigung
+
+### Exakte Release-Bindung
+
+Der feste Pin liegt unter `.config/developer-team/readonly-release.json` im durch
+die Betriebssystem-Benutzerdatenbank bestimmten Home-Verzeichnis. `HOME`, XDG-,
+Git- oder andere Umgebungsvariablen koennen ihn nicht auswaehlen. Er muss ausserhalb
+des Repositorys liegen, eine eigene regulaere Datei mit exakt `0400` sein und darf
+keine Symlinks im Pfad haben. Das Schema hat exakt drei nicht geheime Felder:
+`commit` (40 Hexzeichen), `tree` (40 Hexzeichen), `inventory_sha256` (64 Hexzeichen).
+Nur eine unabhaengig gepruefte Release-Identitaet darf dort installiert werden.
+Es gibt keine CLI-/env-Freigabeoption und keinen automatischen Schreibpfad.
+
+Reproduzierbare Berechnung fuer den Reviewer, ausschliesslich im bereits geprueften
+sauberen Checkout, ohne Dateien zu schreiben:
+
+```sh
+python3 -B -c 'import json; from pathlib import Path; from developer_team.provider_readonly_release import _inventory; print(json.dumps(_inventory(Path.cwd())[0], sort_keys=True))'
+```
+
+Die Berechnung allein ist **keine** unabhaengige Freigabe. Die Ausgabe darf nicht
+ungeprueft als Approval installiert werden. Fuer diesen Draft wird kein echter
+Release-Pin erstellt; der reale Modus bleibt bis zur unabhaengigen Bereitstellung
+gesperrt. Das Pin-Provisioning und der vertrauenswuerdige lokale Python-/Git-/OS-
+Startpunkt liegen ausserhalb der Selbstattestierung dieses Helpers. Wer bereits
+beliebigen Code im Operatorprozess oder dessen Trust Anchor ersetzen kann, kann
+nicht durch einen im selben Prozess laufenden Python-Selbsttest abgewehrt werden.
+
+Der Inventarhash ist SHA-256 des UTF-8-JSON-Arrays in Git-ls-tree-Reihenfolge mit
+kompakten Separatoren und je `[Pfad, Git-Modus, SHA256(Dateibytes)]`. Er umfasst
+**alle** getrackten Dateien, insbesondere Broker, Integritaetspruefer, Collector,
+Scope, HTTPS-, Credential- und Contract-Module. Es gibt keine sich selbst
+ausschliessende ausfuehrbare Datei. Jeder Blob wird zusaetzlich mit seinem Git-Objekt
+verglichen. Index und getrackter Arbeitsbaum muessen exakt HEAD entsprechen;
+direkte Dateihashes erkennen auch `assume-unchanged`, `skip-worktree` und veraltete
+Stat-Caches. Untracked und ignored Dateien werden ebenfalls gesperrt, einschliesslich
+Bytecode, nativer Erweiterungen und Import-Hooks. Ein spaeterer Commit, auch ein
+leerer Commit mit identischem Tree, wird ohne neuen unabhaengigen Pin abgelehnt.
+
+Die Pruefung erfolgt vor Secret-Auswahl/FD-Verwendung und erneut direkt vor jedem
+Credential-Oeffnen bzw. Duplizieren. Vor dem Runnerstart wird nochmals geprueft und
+nur verifizierter Python-Quelltext in ein privates temporaeres Verzeichnis kopiert.
+Der unveraenderte Runner startet mit `-I -S -B` aus dieser Kopie, ohne Site-Packages,
+PYTHONPATH oder Checkout-Bytecode. Nachtraegliche Worktree-Aenderungen werden nicht
+in den Kindprozess importiert. Die Quellkopie wird auch bei Fehlern entfernt.
 
 Der Helper liest keine Secretbytes. Er prueft Owner, exakt `0600`, regulaeren
 Dateityp, Groesse und Read-only-Zugriffsmodus, lehnt Symlinks in allen Pfadteilen
@@ -99,7 +151,8 @@ DT-017B-/DT-017A-Tests bleiben unveraendert aktiv. Actions prueft weiterhin Pyth
 3.11 bis 3.13, Ruff, Format, Coverage, Build, Smoke und Checkpoint mit
 `DT_PROVIDER_OFFLINE=1`. Es wurden keine realen Provider-Reads ausgefuehrt.
 
-Live-Blocker bleiben: reale lokale Credentials und bestaetigte Rollenbindung,
+Live-Blocker bleiben: unabhaengig bereitgestellter exakter externer Release-Pin,
+reale lokale Credentials und bestaetigte Rollenbindung,
 Saved Agent und genehmigte Plan-/Modellbindung, reale Read-only-Account-Evidence,
 unabhaengige Scope-Evidence und Verifier, aktueller Providervertrag,
 Secret-Store- und Realtransport-Attestation, Session-Environment-Nachweis,

@@ -54,6 +54,13 @@ class PrepareTests(unittest.TestCase):
         )
         self.enterContext(patch.dict(os.environ, {}, clear=True))
         self.socket = self.enterContext(patch.object(socket, "socket", side_effect=AssertionError))
+        # Business-flow fixtures have no production release approval. Integrity
+        # itself is exercised with real disposable Git repositories separately.
+        self.enterContext(patch.object(broker, "verify_release", return_value={}))
+        self.enterContext(patch.object(
+            broker, "verified_snapshot",
+            side_effect=lambda root: contextlib.nullcontext(root),
+        ))
 
     def args(self, **changes):
         result = []
@@ -323,14 +330,18 @@ class PrepareTests(unittest.TestCase):
         self.assertEqual(kw["stderr"], subprocess.DEVNULL)
         self.assertNotIn("env", kw)
         self.assertIn("--execute-real-readonly", args[0])
+        for flag in ("-I", "-S", "-B"):
+            self.assertIn(flag, args[0])
         for marker in (ADMIN, CANARY):
             self.assertNotIn(marker, repr(run.call_args))
 
-    def test_modified_runner_or_missing_base_blocks(self):
+    def test_modified_runner_or_missing_release_blocks(self):
         with patch.object(broker, "RUNNER_SHA256", "0" * 64):
             with self.assertRaises(AgentsAPIError):
                 broker._check_checkout()
-        with patch.object(subprocess, "run", return_value=Mock(returncode=1)):
+        with patch.object(
+            broker, "verify_release", side_effect=AgentsAPIError("release_integrity_required")
+        ):
             with self.assertRaises(AgentsAPIError):
                 broker._check_checkout()
 
