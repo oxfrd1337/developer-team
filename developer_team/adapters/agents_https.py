@@ -318,6 +318,7 @@ class HardenedHTTPS:
             raise AgentsAPIError("invalid_external_authorization")
         remaining = request.deadline - self._clock()
         if remaining <= 0:
+            self._transport_failure("TIMEOUT")
             raise AgentsAPIError("https_deadline_exceeded")
         results = queue.Queue(maxsize=1)
         stopped = threading.Event()
@@ -348,14 +349,17 @@ class HardenedHTTPS:
                 conn.auto_open = 0  # Never reconnect implicitly after a deadline closes the socket.
                 conn.connect()  # The caller also bounds the complete DNS/TCP/TLS phase.
                 if stopped.is_set() or self._clock() >= connect_deadline:
+                    failure = "TIMEOUT"
                     return
                 connected.set()
                 if stopped.is_set() or self._clock() >= request.deadline:
+                    failure = "TIMEOUT"
                     return
                 conn.sock.settimeout(min(self._read_timeout, request.deadline - self._clock()))
                 if operation:
                     self._gate(self._binding, operation, path)
                 if stopped.is_set() or self._clock() >= request.deadline:
+                    failure = "TIMEOUT"
                     return
                 self._validate_identity()
                 headers = dict(request.headers)

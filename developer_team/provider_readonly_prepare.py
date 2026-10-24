@@ -192,8 +192,10 @@ def _sanitize(raw):
         or value["outcome"] not in {"BLOCKED", "COLLECTED"}
         or type(value["checks"]) is not dict
         or set(value["checks"]) != set(runner.GATES)
-        or any(type(v) is not str or v not in {"PASS", runner.MISSING}
-               for v in value["checks"].values())
+        or any(
+            type(v) is not str or v not in {"PASS", runner.MISSING}
+            for v in value["checks"].values()
+        )
         or value["LIVE"] != "NO-GO"
         or type(value["real_submissions"]) is not int
         or value["real_submissions"] != 0
@@ -201,12 +203,16 @@ def _sanitize(raw):
         or value["validation"] != expected["validation"]
         or type(value["schema_version"]) is not int
         or value["schema_version"] != 2
-        or not valid_diagnostics(value["provider_diagnostics"], value["checks"],
-                                 value["provider_observations"])
-        or (value["outcome"] == "BLOCKED" and (
-            any(v != runner.MISSING for v in value["checks"].values())
-            or value["provider_diagnostics"] != expected["provider_diagnostics"]
-        ))
+        or not valid_diagnostics(
+            value["provider_diagnostics"], value["checks"], value["provider_observations"]
+        )
+        or (
+            value["outcome"] == "BLOCKED"
+            and (
+                any(v != runner.MISSING for v in value["checks"].values())
+                or value["provider_diagnostics"] != expected["provider_diagnostics"]
+            )
+        )
     ):
         raise AgentsAPIError("invalid_runner_report")
     # Reconstruct instead of forwarding any arbitrary runner output.

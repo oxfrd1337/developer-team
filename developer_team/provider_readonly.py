@@ -51,7 +51,8 @@ def _get(transport, path):
     value = None
     try:
         value = json.loads(
-            response.body, object_pairs_hook=_unique,
+            response.body,
+            object_pairs_hook=_unique,
             parse_constant=lambda _: _require(False),
         )
     except Exception:
@@ -106,9 +107,7 @@ class SpendEvidence:
             and value.get("enforcement") == {"status": "enforcing"}
             and type(value.get("threshold_amount")) is int
         )
-        _require(
-            binding.budget_cents <= value["threshold_amount"] <= 100, "CONFIGURATION_MISMATCH"
-        )
+        _require(binding.budget_cents <= value["threshold_amount"] <= 100, "CONFIGURATION_MISMATCH")
         # Delayed enforcement is never a per-request spending guarantee. DT-017's
         # independent local budget / exclusive single-canary grant stays required.
         return cls(value["threshold_amount"])
@@ -350,13 +349,15 @@ class ProviderReadOnlyCollector:
         except Exception:
             observation = None
         if provider_gate:
-            stage = role._stage if type(role) in {
-                AdminReadOnlyCollector, CanaryReadOnlyCollector
-            } else "PRECHECK"
+            stage = (
+                role._stage
+                if type(role) in {AdminReadOnlyCollector, CanaryReadOnlyCollector}
+                else "PRECHECK"
+            )
             self._diagnostics[check] = {
-                "code": "PASS" if observation is not None else (
-                    "LOCAL_VALIDATION_FAILED" if stage == "PRECHECK" else failure
-                ),
+                "code": "PASS"
+                if observation is not None
+                else ("LOCAL_VALIDATION_FAILED" if stage == "PRECHECK" else failure),
                 "stage": "COMPLETE" if observation is not None else stage,
             }
         return observation

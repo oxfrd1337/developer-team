@@ -34,9 +34,11 @@ class DiagnosticTests(unittest.TestCase):
             result = runner_fixtures.RunnerTests.run_runner(self, **changes)
         self.assertEqual(out.getvalue(), "")
         self.assertEqual(err.getvalue(), "")
-        self.assertTrue(valid_diagnostics(
-            result["provider_diagnostics"], result["checks"], result["provider_observations"]
-        ))
+        self.assertTrue(
+            valid_diagnostics(
+                result["provider_diagnostics"], result["checks"], result["provider_observations"]
+            )
+        )
         self.assertEqual(broker._sanitize(json.dumps(result)), result)
         return result
 
@@ -46,7 +48,8 @@ class DiagnosticTests(unittest.TestCase):
             ("account_project_binding", "ADMIN_PROJECT", root),
             ("account_project_binding", "ADMIN_SERVICE_ACCOUNTS", root + "/service_accounts"),
             (
-                "account_project_binding", "ADMIN_API_KEYS",
+                "account_project_binding",
+                "ADMIN_API_KEYS",
                 root + "/api_keys?owner_project_access=any",
             ),
             ("spend_controls", "ADMIN_SPEND_LIMIT", root + "/spend_limit"),
@@ -58,9 +61,10 @@ class DiagnosticTests(unittest.TestCase):
         result = self.collect()
         self.assertEqual(result["schema_version"], 2)
         self.assertEqual(result["provider_observations"], 3)
-        self.assertEqual(result["provider_diagnostics"], {
-            gate: {"code": "PASS", "stage": "COMPLETE"} for gate in PROVIDER_GATES
-        })
+        self.assertEqual(
+            result["provider_diagnostics"],
+            {gate: {"code": "PASS", "stage": "COMPLETE"} for gate in PROVIDER_GATES},
+        )
         self.assertEqual(result["checks"]["credential_scope"], runner.MISSING)
         self.assertEqual(len(self.h.calls), 6)
 
@@ -68,12 +72,20 @@ class DiagnosticTests(unittest.TestCase):
         original = Connection.getresponse
         for gate, stage, path in self.operations():
             for status, code in (
-                (401, "HTTP_401"), (403, "HTTP_403"), (429, "HTTP_429"),
-                (500, "HTTP_5XX"), (599, "HTTP_5XX"),
-                (301, "HTTP_REDIRECT"), (302, "HTTP_REDIRECT"), (307, "HTTP_REDIRECT"),
-                (308, "HTTP_REDIRECT"), (404, "HTTP_OTHER"), (201, "HTTP_OTHER"),
+                (401, "HTTP_401"),
+                (403, "HTTP_403"),
+                (429, "HTTP_429"),
+                (500, "HTTP_5XX"),
+                (599, "HTTP_5XX"),
+                (301, "HTTP_REDIRECT"),
+                (302, "HTTP_REDIRECT"),
+                (307, "HTTP_REDIRECT"),
+                (308, "HTTP_REDIRECT"),
+                (404, "HTTP_OTHER"),
+                (201, "HTTP_OTHER"),
             ):
                 with self.subTest(stage=stage, status=status):
+
                     def respond(conn, path=path, status=status):
                         response = original(conn)
                         if conn.path == path:
@@ -81,20 +93,28 @@ class DiagnosticTests(unittest.TestCase):
                             if not 200 <= status < 300:
                                 response.read1 = lambda _: self.fail("error body was read")
                         return response
+
                     self.h.calls.clear()
                     with patch.object(Connection, "getresponse", respond):
                         result = self.collect()
-                    self.assertEqual(result["provider_diagnostics"][gate], {
-                        "code": code, "stage": stage,
-                    })
+                    self.assertEqual(
+                        result["provider_diagnostics"][gate],
+                        {
+                            "code": code,
+                            "stage": stage,
+                        },
+                    )
                     self.assertEqual(result["checks"][gate], runner.MISSING)
                     self.assertEqual(result["provider_observations"], 2)
                     self.assertEqual(sum(p == path for _, _, p in self.h.calls), 1)
                     self.assertEqual(len(self.h.calls), len(set(self.h.calls)))
-                    self.assertTrue(set(self.h.calls) <= {
-                        ("canary" if s.startswith("CANARY") else "admin", "GET", p)
-                        for _, s, p in self.operations()
-                    })
+                    self.assertTrue(
+                        set(self.h.calls)
+                        <= {
+                            ("canary" if s.startswith("CANARY") else "admin", "GET", p)
+                            for _, s, p in self.operations()
+                        }
+                    )
 
     def test_all_missing_is_explicit_collection_attempt_with_zero_observations(self):
         self.h.status = 403
@@ -102,12 +122,18 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "COLLECTED")
         self.assertEqual(result["provider_observations"], 0)
         self.assertEqual(set(result["checks"].values()), {runner.MISSING})
-        for gate, stage in (("account_project_binding", "ADMIN_PROJECT"),
-                            ("spend_controls", "ADMIN_SPEND_LIMIT"),
-                            ("agent_configuration", "CANARY_MODELS")):
-            self.assertEqual(result["provider_diagnostics"][gate], {
-                "code": "HTTP_403", "stage": stage,
-            })
+        for gate, stage in (
+            ("account_project_binding", "ADMIN_PROJECT"),
+            ("spend_controls", "ADMIN_SPEND_LIMIT"),
+            ("agent_configuration", "CANARY_MODELS"),
+        ):
+            self.assertEqual(
+                result["provider_diagnostics"][gate],
+                {
+                    "code": "HTTP_403",
+                    "stage": stage,
+                },
+            )
         self.assertEqual(len(self.h.calls), 3)
 
     def test_transport_and_size_failure_at_each_operation_keep_exact_stage(self):
@@ -118,17 +144,24 @@ class DiagnosticTests(unittest.TestCase):
                 (TimeoutError(ADMIN_MARKER), "TIMEOUT"),
                 (AgentsAPIError("http_response_headers_too_large"), "RESPONSE_TOO_LARGE"),
             ):
+
                 def fail_at_stage(conn, path=path, error=error):
                     if conn.path == path:
                         raise error
                     return original(conn)
-                with self.subTest(stage=stage, code=code), patch.object(
-                    Connection, "getresponse", fail_at_stage
+
+                with (
+                    self.subTest(stage=stage, code=code),
+                    patch.object(Connection, "getresponse", fail_at_stage),
                 ):
                     result = self.collect()
-                self.assertEqual(result["provider_diagnostics"][gate], {
-                    "code": code, "stage": stage,
-                })
+                self.assertEqual(
+                    result["provider_diagnostics"][gate],
+                    {
+                        "code": code,
+                        "stage": stage,
+                    },
+                )
                 self.assertEqual(result["provider_observations"], 2)
 
     def test_schema_matrix_identifies_each_operation(self):
@@ -138,31 +171,69 @@ class DiagnosticTests(unittest.TestCase):
                 with self.subTest(stage=stage, shape=type(value)):
                     self.h.responses[path] = value
                     result = self.collect()
-                    self.assertEqual(result["provider_diagnostics"][gate], {
-                        "code": "SCHEMA_MISMATCH", "stage": stage,
-                    })
+                    self.assertEqual(
+                        result["provider_diagnostics"][gate],
+                        {
+                            "code": "SCHEMA_MISMATCH",
+                            "stage": stage,
+                        },
+                    )
             self.h.responses[path] = original
 
     def test_missing_records_configuration_drift_and_budget_are_distinct(self):
         cases = [
-            ("account_project_binding", "ADMIN_SERVICE_ACCOUNTS", "EXPECTED_RECORD_MISSING",
-             self.h.responses[self.h.root + "/service_accounts"], "data", []),
-            ("account_project_binding", "ADMIN_API_KEYS", "EXPECTED_RECORD_MISSING",
-             self.h.responses[self.h.root + "/api_keys?owner_project_access=any"], "data", []),
-            ("agent_configuration", "CANARY_MODELS", "EXPECTED_RECORD_MISSING",
-             self.h.responses["/v1/models"], "data", []),
-            ("agent_configuration", "CANARY_AGENT", "CONFIGURATION_MISMATCH",
-             self.h.agent, "model", "synthetic_drift"),
-            ("spend_controls", "ADMIN_SPEND_LIMIT", "CONFIGURATION_MISMATCH",
-             self.h.spend, "threshold_amount", 101),
+            (
+                "account_project_binding",
+                "ADMIN_SERVICE_ACCOUNTS",
+                "EXPECTED_RECORD_MISSING",
+                self.h.responses[self.h.root + "/service_accounts"],
+                "data",
+                [],
+            ),
+            (
+                "account_project_binding",
+                "ADMIN_API_KEYS",
+                "EXPECTED_RECORD_MISSING",
+                self.h.responses[self.h.root + "/api_keys?owner_project_access=any"],
+                "data",
+                [],
+            ),
+            (
+                "agent_configuration",
+                "CANARY_MODELS",
+                "EXPECTED_RECORD_MISSING",
+                self.h.responses["/v1/models"],
+                "data",
+                [],
+            ),
+            (
+                "agent_configuration",
+                "CANARY_AGENT",
+                "CONFIGURATION_MISMATCH",
+                self.h.agent,
+                "model",
+                "synthetic_drift",
+            ),
+            (
+                "spend_controls",
+                "ADMIN_SPEND_LIMIT",
+                "CONFIGURATION_MISMATCH",
+                self.h.spend,
+                "threshold_amount",
+                101,
+            ),
         ]
         for gate, stage, code, value, key, changed in cases:
             with self.subTest(stage=stage):
                 previous = value[key]
                 value[key] = changed
-                self.assertEqual(self.collect()["provider_diagnostics"][gate], {
-                    "code": code, "stage": stage,
-                })
+                self.assertEqual(
+                    self.collect()["provider_diagnostics"][gate],
+                    {
+                        "code": code,
+                        "stage": stage,
+                    },
+                )
                 value[key] = previous
 
     def test_transport_type_classification_never_uses_error_text(self):
@@ -192,9 +263,27 @@ class DiagnosticTests(unittest.TestCase):
                 patch("queue.Queue.get", side_effect=queue.Empty),
             ):
                 result = self.collect()
-                self.assertEqual({v["code"] for v in result["provider_diagnostics"].values()},
-                                 {"TIMEOUT"})
+                self.assertEqual(
+                    {v["code"] for v in result["provider_diagnostics"].values()}, {"TIMEOUT"}
+                )
                 self.assertEqual(self.h.calls, [])
+
+        transport = self.h.admin._transport
+        with patch.object(transport, "_clock", side_effect=[0, 0, 6]):
+            with self.assertRaisesRegex(AgentsAPIError, "^TIMEOUT$"):
+                transport.read(self.h.root)
+        clock = [0]
+
+        def slow_connect(conn):
+            clock[0] = 3
+
+        with (
+            patch.object(transport, "_clock", side_effect=lambda: clock[0]),
+            patch.object(Connection, "connect", slow_connect),
+        ):
+            with self.assertRaisesRegex(AgentsAPIError, "^TIMEOUT$"):
+                transport.read(self.h.root)
+        self.assertEqual(self.h.calls, [])
 
     def test_bounded_header_failure_and_arbitrary_exception_arguments_are_safe(self):
         for error, code in (
@@ -204,8 +293,9 @@ class DiagnosticTests(unittest.TestCase):
             with self.subTest(code=code):
                 self.h.fault = error
                 result = self.collect()
-                self.assertEqual({v["code"] for v in result["provider_diagnostics"].values()},
-                                 {code})
+                self.assertEqual(
+                    {v["code"] for v in result["provider_diagnostics"].values()}, {code}
+                )
                 with self.assertRaises(AgentsAPIError) as caught:
                     self.h.admin._transport.read(self.h.root)
                 self.assertIsNone(caught.exception.__context__)
@@ -235,9 +325,11 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_expiry_discards_diagnostics_along_with_observations(self):
         factory = self.h.factory
+
         def expire(role):
             self.h.clock += 100
             return factory(role)
+
         self.h.factory = expire
         result = self.collect()
         self.assertEqual(result["outcome"], "BLOCKED")
@@ -248,34 +340,52 @@ class DiagnosticTests(unittest.TestCase):
         with patch("developer_team.agents_acceptance._facts_match", return_value=False):
             result = self.collect()
         self.assertEqual(result["provider_observations"], 0)
-        self.assertEqual(result["provider_diagnostics"], {
-            gate: {"code": "OBSERVATION_REJECTED", "stage": "COMPLETE"} for gate in PROVIDER_GATES
-        })
+        self.assertEqual(
+            result["provider_diagnostics"],
+            {
+                gate: {"code": "OBSERVATION_REJECTED", "stage": "COMPLETE"}
+                for gate in PROVIDER_GATES
+            },
+        )
 
     def test_precondition_failure_has_no_invented_http_cause(self):
         self.h.admin._identity = replace(self.h.identity, expires_at=self.h.clock)
         result = self.h.collector.report()
-        self.assertEqual(result["provider_diagnostics"]["account_project_binding"], {
-            "code": "LOCAL_VALIDATION_FAILED", "stage": "PRECHECK",
-        })
+        self.assertEqual(
+            result["provider_diagnostics"]["account_project_binding"],
+            {
+                "code": "LOCAL_VALIDATION_FAILED",
+                "stage": "PRECHECK",
+            },
+        )
         self.assertEqual(result["checks"]["account_project_binding"], runner.MISSING)
 
     def test_broker_rejects_unknown_dynamic_nested_and_inconsistent_fields(self):
         report = self.collect()
         for mutation in (
-            {"schema_version": 1}, {"schema_version": True},
-            {"provider_observations": True}, {"provider_observations": 0},
-            {"provider_observations": 4}, {"provider_observations": ADMIN_MARKER},
-            {"provider_diagnostics": {}}, {"provider_diagnostics": []},
+            {"schema_version": 1},
+            {"schema_version": True},
+            {"provider_observations": True},
+            {"provider_observations": 0},
+            {"provider_observations": 4},
+            {"provider_observations": ADMIN_MARKER},
+            {"provider_diagnostics": {}},
+            {"provider_diagnostics": []},
             {"provider_diagnostics": report["provider_diagnostics"] | {"extra": ADMIN_MARKER}},
             {"outcome": "BLOCKED"},
         ):
             with self.subTest(field=next(iter(mutation))):
                 with self.assertRaises(AgentsAPIError):
                     broker._sanitize(json.dumps(report | mutation))
-        for field, value in (("code", ADMIN_MARKER), ("stage", ADMIN_MARKER),
-                             ("code", []), ("stage", {}), ("extra", ADMIN_MARKER),
-                             ("stage", "ADMIN_PROJECT"), ("code", "HTTP_401")):
+        for field, value in (
+            ("code", ADMIN_MARKER),
+            ("stage", ADMIN_MARKER),
+            ("code", []),
+            ("stage", {}),
+            ("extra", ADMIN_MARKER),
+            ("stage", "ADMIN_PROJECT"),
+            ("code", "HTTP_401"),
+        ):
             bad = json.loads(json.dumps(report))
             bad["provider_diagnostics"]["agent_configuration"][field] = value
             with self.subTest(field=field, shape=type(value)):
@@ -283,8 +393,9 @@ class DiagnosticTests(unittest.TestCase):
                     broker._sanitize(json.dumps(bad))
 
     def test_production_runner_hash_is_not_renewed_and_blocks_before_release(self):
-        self.assertEqual(broker.RUNNER_SHA256,
-                         "41136330bdc37d0695d2ad262cd13e1ba7b0e88874949daf862847673d8dbd6e")
+        self.assertEqual(
+            broker.RUNNER_SHA256, "41136330bdc37d0695d2ad262cd13e1ba7b0e88874949daf862847673d8dbd6e"
+        )
         with patch.object(broker, "verify_release") as verify, patch("os.pread") as read:
             with self.assertRaisesRegex(AgentsAPIError, "^runner_changed$"):
                 broker._check_checkout()

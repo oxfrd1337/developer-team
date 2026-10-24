@@ -131,7 +131,8 @@ class _ReadOnlyHTTPS(HardenedHTTPS):
         if type(error) is AgentsAPIError and error.args == ("unsupported_proxy_configuration",):
             return "TLS_OR_PROXY_FAILURE"
         if type(error) is AgentsAPIError and error.args in (
-            ("http_response_body_too_large",), ("http_response_headers_too_large",)
+            ("http_response_body_too_large",),
+            ("http_response_headers_too_large",),
         ):
             return "RESPONSE_TOO_LARGE"
         return "TRANSPORT_FAILURE"

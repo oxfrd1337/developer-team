@@ -78,9 +78,11 @@ class RunnerTests(unittest.TestCase):
         return result
 
     def assert_halt(self, report):
-        self.assertTrue(valid_diagnostics(
-            report["provider_diagnostics"], report["checks"], report["provider_observations"]
-        ))
+        self.assertTrue(
+            valid_diagnostics(
+                report["provider_diagnostics"], report["checks"], report["provider_observations"]
+            )
+        )
         self.assertEqual(report["real_submissions"], 0)
         self.assertEqual(report["LIVE"], "NO-GO")
         self.assertIs(report["live_authorized"], False)
