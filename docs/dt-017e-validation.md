@@ -36,6 +36,7 @@ Dieser Bericht beschreibt Entwicklungsprüfung, keine unabhängige Release-Freig
 | Fehlende Account-/Key-/Modellrecords | Separater `EXPECTED_RECORD_MISSING` |
 | Agentendrift, Limit über 100 Cent | `CONFIGURATION_MISMATCH`, `BUDGET_MISMATCH` |
 | Rollenwechsel, FDs, unveränderliche Pins | Neue Diagnoseprüfung plus bisherige vollständige Rollen-/FD-Suite |
+| Verifier verwirft später begonnene Observation | `OBSERVATION_INVALID`; bestehender Zeitvertrag und Gate bleiben unverändert |
 | Wiederholte Erhebung nach Erfolg | Alter PASS wird durch aktuellen Fehler ersetzt |
 | Reportmanipulation | Unbekannte/zusätzliche Felder, falsche Typen, Schema 1 und widersprüchliche PASS-/Zählerangaben werden gesperrt |
 | Releaseintegrität | Vollständige bisherige Suite plus Sperre des unveränderten Produktions-Runner-Pins vor Credential-Zugriff |
@@ -47,12 +48,15 @@ Sendesperren. Alle Fixtures sind künstlich; keine echten Credentials verwendet.
 
 ## Ausführungsstand
 
-- Vollständige lokale Python-3.12-Suite: **723 Tests PASS**, kein Skip.
+- Vollständige lokale Python-3.12-Suite: **725 Tests PASS**, kein Skip.
 - Betroffene Module unter Python 3.12 und zusätzlich Python 3.13: jeweils
-  **103 Tests PASS**.
+  **105 Tests PASS**.
 - Konfigurationsvalidierung für Pilot und synthetisches Projekt: PASS.
 - Synthetischer CLI-Smoke `test-fix`: PASS, erwarteter sicher gesperrter Status.
 - `git diff --check`: PASS.
+- Deutscher vollständiger Beispielreport durch echten Broker-Sanitizer: PASS.
+- AST-Vergleich gegen die Basis: GET-Whitelist, Mutationsdispatch, Rollenprüfung,
+  Broker-Release-/FD-Pfad unverändert; Releaseverifier zusätzlich bytegleich.
 - Die verwaltete Umgebung enthält keine Ruff-/Coverage-/Build-Installation;
   Installation der gepinnten Werkzeuge war dort nicht verfügbar. Diese lokalen
   Prüfungen sind deshalb kein PASS. Die bestehende GitHub-CI-Matrix 3.11–3.13

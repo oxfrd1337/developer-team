@@ -389,9 +389,13 @@ class ProviderReadOnlyCollector:
 
     def report(self):
         checks, _ = ReadOnlyVerifier(self).inspect(self._binding, int(self._now()), self._identity)
+        diagnostics = self.diagnostics()
+        for gate in PROVIDER_GATES:
+            if checks[gate] != "PASS" and diagnostics[gate]["code"] == "PASS":
+                diagnostics[gate] = {"stage": "FINAL_VALIDATION", "code": "OBSERVATION_INVALID"}
         return {
             "mode": "dt017a-readonly-provider",
-            "provider_diagnostics": self.diagnostics(),
+            "provider_diagnostics": diagnostics,
             "checks": {name: checks[name] for name in ACCOUNT_CHECKS},
             "real_submissions": 0,
             "live": "NO-GO",

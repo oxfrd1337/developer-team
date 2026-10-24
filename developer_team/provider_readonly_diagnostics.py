@@ -48,6 +48,7 @@ CODES = frozenset(
         "BUDGET_MISMATCH",
         "IDENTITY_OR_HANDLE_INVALID",
         "READ_UNAVAILABLE",
+        "OBSERVATION_INVALID",
     }
 )
 # Internal wire statuses are never provider HTTP statuses and never leave reports.

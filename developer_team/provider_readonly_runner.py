@@ -172,7 +172,7 @@ def run_readonly(
             ):
                 report["provider_diagnostics"][name] = {
                     "stage": "FINAL_VALIDATION",
-                    "code": "IDENTITY_OR_HANDLE_INVALID",
+                    "code": "OBSERVATION_INVALID",
                 }
         if any(report["checks"][name] == "PASS" for name in PROVIDER_GATES):
             report["provider_observations"] = "SOME_VALID"

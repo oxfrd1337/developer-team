@@ -18,7 +18,7 @@ from developer_team.adapters.agents_https import FDSecretStore
 from developer_team.adapters.provider_readonly_https import AdminReadOnlyHTTPS, CanaryReadOnlyHTTPS
 from developer_team.provider_readonly_runner import ExternalFD, main, run_readonly
 from tests.acceptance_support import SYNTHETIC_SECRET
-from tests.provider_readonly_support import ADMIN_MARKER, Harness, admin_identity
+from tests.provider_readonly_support import ADMIN_MARKER, Connection, Harness, admin_identity
 
 
 class RunnerTests(unittest.TestCase):
@@ -139,6 +139,25 @@ class RunnerTests(unittest.TestCase):
             with self.subTest(consent=consent):
                 self.assertEqual(self.run_runner(consent)["outcome"], "BLOCKED")
         self.assertEqual(self.h.connections, [])
+
+    def test_collector_pass_rejected_by_existing_verifier_stays_missing(self):
+        original = Connection.getresponse
+
+        def response(conn):
+            result = original(conn)
+            self.h.clock += 1
+            return result
+
+        with patch.object(Connection, "getresponse", response):
+            report = self.run_runner()
+        # The existing verifier's fixed inspect timestamp rejects observations
+        # started later. Diagnostics must not bypass it or invent an auth cause.
+        for gate in ("spend_controls", "agent_configuration"):
+            self.assertEqual(report["checks"][gate], "MISSING_OR_INVALID")
+            self.assertEqual(
+                report["provider_diagnostics"][gate],
+                {"stage": "FINAL_VALIDATION", "code": "OBSERVATION_INVALID"},
+            )
 
     def test_ci_and_secret_environment_never_execute(self):
         for name in (

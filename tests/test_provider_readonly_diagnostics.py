@@ -252,6 +252,23 @@ class DiagnosticsTests(unittest.TestCase):
         )
         self.assertEqual(h.collector.diagnostics()["spend_controls"]["code"], "NOT_ATTEMPTED")
 
+    def test_verifier_timestamp_rejection_does_not_report_diagnostic_pass(self):
+        original = Connection.getresponse
+
+        def response(conn):
+            result = original(conn)
+            self.h.clock += 1
+            return result
+
+        with patch.object(Connection, "getresponse", response):
+            report = self.report()
+        for gate in ("spend_controls", "agent_configuration"):
+            self.assertEqual(report["checks"][gate], runner.MISSING)
+            self.assertEqual(
+                report["provider_diagnostics"][gate],
+                {"stage": "FINAL_VALIDATION", "code": "OBSERVATION_INVALID"},
+            )
+
     def test_role_swaps_remain_blocked_before_any_connection(self):
         h = self.h
         h.collector._admin, h.collector._canary = h.canary, h.admin

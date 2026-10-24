@@ -46,6 +46,7 @@ weniger als sechs sein. Die Diagnose enthält keine Pfade oder Referenzen.
 | `TIMEOUT` | Transporttimeout oder Connect-/Read-/Gesamtfrist überschritten |
 | `RESPONSE_TOO_LARGE` | Bodygrenze (maximal 65536 Bytes) oder Headergrenze überschritten |
 | `TRANSPORT_FAILURE` | Sonstiger sicher klassifizierter Wire-Fehler, einschließlich nicht genauer einordenbarer Proxy-/Verbindungsabbrüche |
+| `OBSERVATION_INVALID` | Collector erfolgreich, aber Observation vom bestehenden Verifier oder abschließender Frischeprüfung verworfen; kein Rückschluss auf Authentifizierung |
 | `READ_UNAVAILABLE` | Kein verwertbares Read-Ergebnis, etwa Secret-Store-/Handle-/Abschlussfehler; keine sichere feinere Ursachenbestimmung |
 | `SCHEMA_MISMATCH` | JSON-/Contractprüfung scheitert, einschließlich doppelter Keys, Nichtfinite-Werte, falscher Typen und unbekannter Agentfelder |
 | `EXPECTED_RECORD_MISSING` | Erwarteter Eintrag fehlt in gültiger Account-/Key-/Modellliste |
