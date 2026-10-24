@@ -60,8 +60,13 @@ class PrepareTests(unittest.TestCase):
         self.enterContext(patch.object(broker, "verify_release", return_value={}))
         # Synthetic fixtures only: the production runner pin deliberately stays
         # unchanged until independent exact-HEAD release review/provisioning.
-        self.enterContext(patch.object(broker, "RUNNER_SHA256", hashlib.sha256(
-            Path(runner.__file__).read_bytes()).hexdigest()))
+        self.enterContext(
+            patch.object(
+                broker,
+                "RUNNER_SHA256",
+                hashlib.sha256(Path(runner.__file__).read_bytes()).hexdigest(),
+            )
+        )
         self.enterContext(
             patch.object(
                 broker,

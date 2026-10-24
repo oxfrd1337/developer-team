@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+import http.client
 import math
 import os
 import re
-import stat
 import socket
 import ssl
-import http.client
+import stat
 from dataclasses import dataclass
 
+from ..provider_readonly_diagnostics import WIRE_FAILURES, DiagnosticFailure
 from .agents_api_contracts import (
     PROVIDER_BASE,
     AgentsAPIError,
@@ -21,7 +22,6 @@ from .agents_api_contracts import (
 )
 from .agents_credentials import require_identity
 from .agents_https import FDSecretStore, HardenedHTTPS, ResponseTooLarge
-from ..provider_readonly_diagnostics import DiagnosticFailure, WIRE_FAILURES
 
 
 @dataclass(frozen=True, slots=True, repr=False)

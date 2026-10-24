@@ -47,9 +47,9 @@ Sendesperren. Alle Fixtures sind künstlich; keine echten Credentials verwendet.
 
 ## Ausführungsstand
 
-- Lokale Zieltests und vollständige Suite: endgültige Ergebnisse werden nach
-  Abschluss der Prüfungen in diesem Bericht festgehalten.
-- Lokales Python 3.12 und zusätzlich Python 3.13 für die betroffenen Module.
+- Vollständige lokale Python-3.12-Suite: **723 Tests PASS**, kein Skip.
+- Betroffene Module unter Python 3.12 und zusätzlich Python 3.13: jeweils
+  **103 Tests PASS**.
 - Konfigurationsvalidierung für Pilot und synthetisches Projekt: PASS.
 - Synthetischer CLI-Smoke `test-fix`: PASS, erwarteter sicher gesperrter Status.
 - `git diff --check`: PASS.

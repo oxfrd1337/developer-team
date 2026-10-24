@@ -10,17 +10,15 @@ import json
 import time
 from dataclasses import dataclass
 
-from .adapters.agents_api_contracts import (
-    AgentsAPIError,
-    bounded_int,
-    safe_ref,
-    sha256,
-)
+from .adapters.agents_api_contracts import bounded_int, safe_ref, sha256
 from .adapters.agents_credentials import require_identity
 from .adapters.provider_readonly_https import AdminReadOnlyHTTPS, CanaryReadOnlyHTTPS
 from .agents_acceptance import ACCOUNT_CHECKS, Observation, ReadOnlyVerifier
 from .provider_readonly_diagnostics import (
-    DiagnosticFailure, WIRE_FAILURES, PROVIDER_GATES, empty_diagnostics,
+    PROVIDER_GATES,
+    WIRE_FAILURES,
+    DiagnosticFailure,
+    empty_diagnostics,
 )
 from .scope_evidence import ScopeEvidence, validate_scope_subjects
 
@@ -59,10 +57,10 @@ def _get(transport, path):
             code = "HTTP_OTHER"
         raise DiagnosticFailure(code)
     try:
-        _require(type(response.body) is bytes and len(response.body) <= 65536,
-                 "RESPONSE_TOO_LARGE")
-        value = json.loads(response.body, object_pairs_hook=_unique,
-                           parse_constant=lambda _: _require(False))
+        _require(type(response.body) is bytes and len(response.body) <= 65536, "RESPONSE_TOO_LARGE")
+        value = json.loads(
+            response.body, object_pairs_hook=_unique, parse_constant=lambda _: _require(False)
+        )
         _require(type(value) is dict)
         return value
     except DiagnosticFailure:
@@ -115,7 +113,7 @@ class SpendEvidence:
             and value.get("interval") == "month"
             and value.get("enforcement") == {"status": "enforcing"}
             and type(value.get("threshold_amount")) is int
-                    )
+        )
         _require(binding.budget_cents <= value["threshold_amount"] <= 100, "BUDGET_MISMATCH")
         # Delayed enforcement is never a per-request spending guarantee. DT-017's
         # independent local budget / exclusive single-canary grant stays required.
@@ -146,12 +144,15 @@ class AdminReadOnlyCollector(_StagedCollector):
             and project.get("object") == "organization.project"
             and project.get("status") == "active"
         )
-        account = _record(self._get("ADMIN_SERVICE_ACCOUNTS", root + "/service_accounts"), c.service_account_ref)
+        account = _record(
+            self._get("ADMIN_SERVICE_ACCOUNTS", root + "/service_accounts"), c.service_account_ref
+        )
         _require(account.get("object") == "organization.project.service_account")
         _require(account.get("role") in {"owner", "member", "none"})
         expires_at = min(expires_at, _not_expired(account, int(self._now())))
         key = _record(
-            self._get("ADMIN_API_KEYS", root + "/api_keys?owner_project_access=any"), c.credential_ref
+            self._get("ADMIN_API_KEYS", root + "/api_keys?owner_project_access=any"),
+            c.credential_ref,
         )
         _require(
             key.get("object") == "organization.project.api_key"
@@ -184,7 +185,9 @@ class AdminReadOnlyCollector(_StagedCollector):
     def spend(self):
         self._validate()
         b = self._binding
-        value = self._get("ADMIN_SPEND_LIMIT", f"/v1/organization/projects/{b.project_id}/spend_limit")
+        value = self._get(
+            "ADMIN_SPEND_LIMIT", f"/v1/organization/projects/{b.project_id}/spend_limit"
+        )
         evidence = SpendEvidence.from_provider(value, b)
         self._stage = "FINAL_VALIDATION"
         self._validate()
@@ -239,8 +242,10 @@ class CanaryReadOnlyCollector(_StagedCollector):
         _require(set(saved) <= set(expected) | metadata)
         _require(saved.get("id") == b.agent_id and saved.get("object") == "agent")
         _require(all(key in saved for key in expected))
-        _require(sha256({key: saved[key] for key in expected}) == sha256(expected),
-                 "CONFIGURATION_MISMATCH")
+        _require(
+            sha256({key: saved[key] for key in expected}) == sha256(expected),
+            "CONFIGURATION_MISMATCH",
+        )
         self._stage = "FINAL_VALIDATION"
         self._validate()
         return {
@@ -297,7 +302,10 @@ class ProviderReadOnlyCollector:
         observation = None
         target = None
         if check in PROVIDER_GATES:
-            self._diagnostics[check] = {"stage": "IDENTITY_VALIDATION", "code": "IDENTITY_OR_HANDLE_INVALID"}
+            self._diagnostics[check] = {
+                "stage": "IDENTITY_VALIDATION",
+                "code": "IDENTITY_OR_HANDLE_INVALID",
+            }
         try:
             _require(binding == self._binding)
             self._separation()
@@ -359,7 +367,9 @@ class ProviderReadOnlyCollector:
         except Exception as error:
             if check in PROVIDER_GATES:
                 stage = target._stage if target is not None else "IDENTITY_VALIDATION"
-                code = error.code if type(error) is DiagnosticFailure else "IDENTITY_OR_HANDLE_INVALID"
+                code = (
+                    error.code if type(error) is DiagnosticFailure else "IDENTITY_OR_HANDLE_INVALID"
+                )
                 if stage in {"IDENTITY_VALIDATION", "FINAL_VALIDATION"}:
                     code = "IDENTITY_OR_HANDLE_INVALID"
                 self._diagnostics[check] = {"stage": stage, "code": code}

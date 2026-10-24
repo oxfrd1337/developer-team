@@ -114,9 +114,9 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(report["schema_version"], 2)
         self.assertEqual(report["provider_observations"], "SOME_VALID")
         for gate in ("account_project_binding", "spend_controls", "agent_configuration"):
-            self.assertEqual(report["provider_diagnostics"][gate], {
-                "stage": "FINAL_VALIDATION", "code": "PASS"
-            })
+            self.assertEqual(
+                report["provider_diagnostics"][gate], {"stage": "FINAL_VALIDATION", "code": "PASS"}
+            )
         self.assertEqual(report["checks"]["credential_scope"], "MISSING_OR_INVALID")
         for check in ("account_project_binding", "spend_controls", "agent_configuration"):
             self.assertEqual(report["checks"][check], "PASS")
@@ -239,8 +239,9 @@ class RunnerTests(unittest.TestCase):
                 self.assertEqual(set(report["checks"].values()), {"MISSING_OR_INVALID"})
                 self.assertEqual(report["outcome"], "COLLECTED")
                 self.assertEqual(report["provider_observations"], "NONE_VALID")
-                self.assertTrue(all(item["code"] != "PASS"
-                                    for item in report["provider_diagnostics"].values()))
+                self.assertTrue(
+                    all(item["code"] != "PASS" for item in report["provider_diagnostics"].values())
+                )
                 self.assertEqual(len(self.h.calls), 3)
                 self.assertEqual(len(set(self.h.calls)), 3)
 

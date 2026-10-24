@@ -42,9 +42,15 @@ class ReleaseTests(unittest.TestCase):
         self.production_runner_pin = broker.RUNNER_SHA256
         # Approval applies only to this disposable synthetic repository. Never
         # renew the production runner pin or provision the operator's real pin.
-        self.enterContext(patch.object(broker, "RUNNER_SHA256", hashlib.sha256(
-            (self.root / "developer_team/provider_readonly_runner.py").read_bytes()
-        ).hexdigest()))
+        self.enterContext(
+            patch.object(
+                broker,
+                "RUNNER_SHA256",
+                hashlib.sha256(
+                    (self.root / "developer_team/provider_readonly_runner.py").read_bytes()
+                ).hexdigest(),
+            )
+        )
         self.enterContext(
             patch.object(
                 broker, "__file__", str(self.root / "developer_team/provider_readonly_prepare.py")
@@ -91,8 +97,10 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("developer_team/provider_readonly_release.py", sources)
 
     def test_unrenewed_production_runner_pin_blocks_before_credentials(self):
-        self.assertEqual(self.production_runner_pin,
-                         "41136330bdc37d0695d2ad262cd13e1ba7b0e88874949daf862847673d8dbd6e")
+        self.assertEqual(
+            self.production_runner_pin,
+            "41136330bdc37d0695d2ad262cd13e1ba7b0e88874949daf862847673d8dbd6e",
+        )
         with patch.object(broker, "RUNNER_SHA256", self.production_runner_pin):
             self.blocked_before_credentials()
 

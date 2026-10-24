@@ -5,28 +5,58 @@ from .adapters.agents_api_contracts import AgentsAPIError
 PROVIDER_GATES = ("account_project_binding", "spend_controls", "agent_configuration")
 STAGES = {
     "account_project_binding": frozenset(
-        {"NOT_ATTEMPTED", "IDENTITY_VALIDATION", "ADMIN_PROJECT",
-         "ADMIN_SERVICE_ACCOUNTS", "ADMIN_API_KEYS", "FINAL_VALIDATION"}
+        {
+            "NOT_ATTEMPTED",
+            "IDENTITY_VALIDATION",
+            "ADMIN_PROJECT",
+            "ADMIN_SERVICE_ACCOUNTS",
+            "ADMIN_API_KEYS",
+            "FINAL_VALIDATION",
+        }
     ),
     "spend_controls": frozenset(
         {"NOT_ATTEMPTED", "IDENTITY_VALIDATION", "ADMIN_SPEND_LIMIT", "FINAL_VALIDATION"}
     ),
     "agent_configuration": frozenset(
-        {"NOT_ATTEMPTED", "IDENTITY_VALIDATION", "CANARY_MODELS", "CANARY_AGENT",
-         "FINAL_VALIDATION"}
+        {
+            "NOT_ATTEMPTED",
+            "IDENTITY_VALIDATION",
+            "CANARY_MODELS",
+            "CANARY_AGENT",
+            "FINAL_VALIDATION",
+        }
     ),
 }
-CODES = frozenset({
-    "NOT_ATTEMPTED", "PASS", "HTTP_401", "HTTP_403", "HTTP_429", "HTTP_5XX",
-    "HTTP_OTHER", "REDIRECT_BLOCKED", "TLS_OR_PROXY_FAILURE", "DNS_FAILURE",
-    "TRANSPORT_FAILURE", "TIMEOUT", "RESPONSE_TOO_LARGE", "SCHEMA_MISMATCH",
-    "EXPECTED_RECORD_MISSING", "CONFIGURATION_MISMATCH", "BUDGET_MISMATCH",
-    "IDENTITY_OR_HANDLE_INVALID", "READ_UNAVAILABLE",
-})
+CODES = frozenset(
+    {
+        "NOT_ATTEMPTED",
+        "PASS",
+        "HTTP_401",
+        "HTTP_403",
+        "HTTP_429",
+        "HTTP_5XX",
+        "HTTP_OTHER",
+        "REDIRECT_BLOCKED",
+        "TLS_OR_PROXY_FAILURE",
+        "DNS_FAILURE",
+        "TRANSPORT_FAILURE",
+        "TIMEOUT",
+        "RESPONSE_TOO_LARGE",
+        "SCHEMA_MISMATCH",
+        "EXPECTED_RECORD_MISSING",
+        "CONFIGURATION_MISMATCH",
+        "BUDGET_MISMATCH",
+        "IDENTITY_OR_HANDLE_INVALID",
+        "READ_UNAVAILABLE",
+    }
+)
 # Internal wire statuses are never provider HTTP statuses and never leave reports.
 WIRE_FAILURES = {
-    -1: "TIMEOUT", -2: "TLS_OR_PROXY_FAILURE", -3: "DNS_FAILURE",
-    -4: "RESPONSE_TOO_LARGE", -5: "TRANSPORT_FAILURE",
+    -1: "TIMEOUT",
+    -2: "TLS_OR_PROXY_FAILURE",
+    -3: "DNS_FAILURE",
+    -4: "RESPONSE_TOO_LARGE",
+    -5: "TRANSPORT_FAILURE",
 }
 
 
@@ -48,9 +78,12 @@ def sanitize_diagnostics(value):
     for gate in PROVIDER_GATES:
         item = value[gate]
         if (
-            type(item) is not dict or set(item) != {"stage", "code"}
-            or type(item["stage"]) is not str or item["stage"] not in STAGES[gate]
-            or type(item["code"]) is not str or item["code"] not in CODES
+            type(item) is not dict
+            or set(item) != {"stage", "code"}
+            or type(item["stage"]) is not str
+            or item["stage"] not in STAGES[gate]
+            or type(item["code"]) is not str
+            or item["code"] not in CODES
             or (item["stage"] == "NOT_ATTEMPTED") != (item["code"] == "NOT_ATTEMPTED")
             or (item["code"] == "PASS" and item["stage"] != "FINAL_VALIDATION")
         ):

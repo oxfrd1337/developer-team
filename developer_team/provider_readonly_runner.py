@@ -166,9 +166,13 @@ def run_readonly(
         report["outcome"] = "COLLECTED"
         report["provider_diagnostics"] = collector.diagnostics()
         for name in PROVIDER_GATES:
-            if report["checks"][name] != "PASS" and report["provider_diagnostics"][name]["code"] == "PASS":
+            if (
+                report["checks"][name] != "PASS"
+                and report["provider_diagnostics"][name]["code"] == "PASS"
+            ):
                 report["provider_diagnostics"][name] = {
-                    "stage": "FINAL_VALIDATION", "code": "IDENTITY_OR_HANDLE_INVALID"
+                    "stage": "FINAL_VALIDATION",
+                    "code": "IDENTITY_OR_HANDLE_INVALID",
                 }
         if any(report["checks"][name] == "PASS" for name in PROVIDER_GATES):
             report["provider_observations"] = "SOME_VALID"
