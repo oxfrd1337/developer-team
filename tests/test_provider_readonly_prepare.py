@@ -48,7 +48,8 @@ class PrepareTests(unittest.TestCase):
         self.values = asdict(binding())
         del self.values["provider_base"]
         self.values.update(
-            admin_ref="admin_synthetic", credential_ref="key_synthetic",
+            admin_ref="admin_synthetic",
+            credential_ref="key_synthetic",
             service_account_ref="sa_synthetic",
         )
         self.enterContext(patch.dict(os.environ, {}, clear=True))
@@ -63,8 +64,11 @@ class PrepareTests(unittest.TestCase):
 
     def execute_args(self, **changes):
         return self.args(**changes) + [
-            "--execute-real-readonly", "--admin-fd", str(self.fds[0]),
-            "--canary-fd", str(self.fds[1]),
+            "--execute-real-readonly",
+            "--admin-fd",
+            str(self.fds[0]),
+            "--canary-fd",
+            str(self.fds[1]),
         ]
 
     def cli(self, args):
@@ -83,26 +87,38 @@ class PrepareTests(unittest.TestCase):
         return result
 
     def test_default_opens_no_fds_reads_no_stdin_and_only_lists_missing(self):
-        with patch("builtins.open", side_effect=AssertionError), patch(
-            "os.open", side_effect=AssertionError
-        ), patch("os.pread", side_effect=AssertionError), patch(
-            "os.fstat", side_effect=AssertionError
-        ), patch("sys.stdin", Mock(read=Mock(side_effect=AssertionError))):
+        with (
+            patch("builtins.open", side_effect=AssertionError),
+            patch("os.open", side_effect=AssertionError),
+            patch("os.pread", side_effect=AssertionError),
+            patch("os.fstat", side_effect=AssertionError),
+            patch("sys.stdin", Mock(read=Mock(side_effect=AssertionError))),
+        ):
             result = self.cli([])
         self.assertEqual(result["missing_bindings"], list(broker.FIELDS))
         self.assertEqual(result["outcome"], "NOT_EXECUTED")
 
     def test_complete_plan_opens_nothing_and_does_not_inspect_supplied_fds(self):
         args = self.args() + ["--admin-fd", "999999", "--canary-fd", "999998"]
-        with patch("os.open", side_effect=AssertionError), patch(
-            "os.fstat", side_effect=AssertionError
-        ), patch.object(broker, "_check_checkout", side_effect=AssertionError):
+        with (
+            patch("os.open", side_effect=AssertionError),
+            patch("os.fstat", side_effect=AssertionError),
+            patch.object(broker, "_check_checkout", side_effect=AssertionError),
+        ):
             self.assertEqual(self.cli(args)["missing_bindings"], [])
 
     def test_argv_secret_paths_values_and_mutation_options_block_without_echo(self):
         for option in (
-            "--api-key", "--admin-secret", "--canary-secret", "--admin-path",
-            "--canary-path", "--manifest", "--url", "--method", "--live", "--execute",
+            "--api-key",
+            "--admin-secret",
+            "--canary-secret",
+            "--admin-path",
+            "--canary-path",
+            "--manifest",
+            "--url",
+            "--method",
+            "--live",
+            "--execute",
         ):
             with self.subTest(option=option):
                 self.assertEqual(self.cli([option, ADMIN])["outcome"], "BLOCKED")
@@ -110,30 +126,47 @@ class PrepareTests(unittest.TestCase):
 
     def test_offline_ci_and_secret_environment_block_before_file_access(self):
         for name in (
-            "CI", "GITHUB_ACTIONS", "DT_PROVIDER_OFFLINE", "OPENAI_API_KEY",
-            "OPENAI_ADMIN_KEY", "DT_ADMIN_SECRET_PATH", "CANARY_CREDENTIAL", "ADMIN_TOKEN",
+            "CI",
+            "GITHUB_ACTIONS",
+            "DT_PROVIDER_OFFLINE",
+            "OPENAI_API_KEY",
+            "OPENAI_ADMIN_KEY",
+            "DT_ADMIN_SECRET_PATH",
+            "CANARY_CREDENTIAL",
+            "ADMIN_TOKEN",
         ):
-            with self.subTest(name=name), patch.dict(os.environ, {name: ADMIN}), patch(
-                "os.dup", side_effect=AssertionError
-            ), patch.object(broker, "_check_checkout", side_effect=AssertionError):
+            with (
+                self.subTest(name=name),
+                patch.dict(os.environ, {name: ADMIN}),
+                patch("os.dup", side_effect=AssertionError),
+                patch.object(broker, "_check_checkout", side_effect=AssertionError),
+            ):
                 result = self.cli(self.execute_args())
                 self.assertEqual(result["reason"], "offline_or_secret_environment")
 
     def test_piped_stdin_never_used_and_missing_agent_is_structured(self):
-        with patch("builtins.open", side_effect=OSError(ADMIN)), patch(
-            "sys.stdin", Mock(read=Mock(side_effect=AssertionError))
-        ), patch.object(broker, "_execute") as execute:
+        with (
+            patch("builtins.open", side_effect=OSError(ADMIN)),
+            patch("sys.stdin", Mock(read=Mock(side_effect=AssertionError))),
+            patch.object(broker, "_execute") as execute,
+        ):
             result = self.cli(self.execute_args(agent_id=None))
         self.assertEqual(result["reason"], "agent_id_missing")
         execute.assert_not_called()
 
     def test_invalid_binding_fields_block_before_opening_secret_handles(self):
         for changes in (
-            {"project_id": "../project"}, {"agent_id": "sk-secret"},
-            {"service_account_ref": "bad/ref"}, {"credential_ref": "Bearer"},
-            {"admin_ref": "key_synthetic"}, {"model": "https://example.com"},
-            {"intent_id": "bad/ref"}, {"idempotency_key": "bad/ref"},
-            {"plan_digest": "b" * 63}, {"budget_cents": 0}, {"budget_cents": 101},
+            {"project_id": "../project"},
+            {"agent_id": "sk-secret"},
+            {"service_account_ref": "bad/ref"},
+            {"credential_ref": "Bearer"},
+            {"admin_ref": "key_synthetic"},
+            {"model": "https://example.com"},
+            {"intent_id": "bad/ref"},
+            {"idempotency_key": "bad/ref"},
+            {"plan_digest": "b" * 63},
+            {"budget_cents": 0},
+            {"budget_cents": 101},
         ):
             with self.subTest(changes=changes), patch.object(broker, "_execute") as execute:
                 self.assertEqual(
@@ -209,9 +242,10 @@ class PrepareTests(unittest.TestCase):
         fd = os.open(hardlink, os.O_RDONLY)
         self.addCleanup(os.close, fd)
         for canary in (self.fds[0], fd):
-            with patch.object(broker, "_check_checkout", return_value=self.root), patch.object(
-                broker, "_invoke"
-            ) as invoke:
+            with (
+                patch.object(broker, "_check_checkout", return_value=self.root),
+                patch.object(broker, "_invoke") as invoke,
+            ):
                 with self.assertRaises(AgentsAPIError):
                     broker._execute(self.values, binding(), self.fds[0], canary, None)
                 invoke.assert_not_called()
@@ -242,9 +276,9 @@ class PrepareTests(unittest.TestCase):
                 seen.append((manifest, admin_fd, canary_fd))
                 value, bound, identity, admin = runner._manifest(manifest)
                 runner.ExternalFD(admin_fd, admin, tuple(value["admin_fd_pin"])).validate(admin)
-                runner.ExternalFD(
-                    canary_fd, identity, tuple(value["canary_fd_pin"])
-                ).validate(identity)
+                runner.ExternalFD(canary_fd, identity, tuple(value["canary_fd_pin"])).validate(
+                    identity
+                )
                 self.assertEqual(manifest.stat().st_mode & 0o777, 0o600)
                 self.assertEqual(manifest.parent.stat().st_mode & 0o777, 0o700)
                 if fault is not None:
@@ -268,8 +302,10 @@ class PrepareTests(unittest.TestCase):
         report = runner._report("READ_ONLY", "COLLECTED")
         self.assertEqual(broker._sanitize(json.dumps(report)), report)
         for value in (
-            report | {"extra": ADMIN}, report | {"outcome": CANARY},
-            report | {"live_authorized": True}, report | {"real_submissions": 1},
+            report | {"extra": ADMIN},
+            report | {"outcome": CANARY},
+            report | {"live_authorized": True},
+            report | {"real_submissions": 1},
             report | {"checks": dict.fromkeys(runner.GATES, ADMIN)},
         ):
             with self.assertRaises(AgentsAPIError):
@@ -311,21 +347,29 @@ class PrepareTests(unittest.TestCase):
         def invoke(root, manifest, admin_fd, canary_fd):
             value, bound, identity, admin = runner._manifest(manifest)
             return runner.run_readonly(
-                bound, identity, admin,
+                bound,
+                identity,
+                admin,
                 admin_fd=runner.ExternalFD(admin_fd, admin, tuple(value["admin_fd_pin"])),
                 canary_fd=runner.ExternalFD(canary_fd, identity, tuple(value["canary_fd_pin"])),
                 approved_models=frozenset(value["approved_models"]),
-                execute_real_readonly=True, now=lambda: NOW,
+                execute_real_readonly=True,
+                now=lambda: NOW,
             )
 
-        with patch.object(broker, "_invoke", side_effect=invoke), patch(
-            "developer_team.provider_readonly_prepare.time.time", return_value=NOW
-        ), patch.object(
-            AdminReadOnlyHTTPS, "_connection",
-            staticmethod(lambda *a, **k: harness.factory("admin")),
-        ), patch.object(
-            CanaryReadOnlyHTTPS, "_connection",
-            staticmethod(lambda *a, **k: harness.factory("canary")),
+        with (
+            patch.object(broker, "_invoke", side_effect=invoke),
+            patch("developer_team.provider_readonly_prepare.time.time", return_value=NOW),
+            patch.object(
+                AdminReadOnlyHTTPS,
+                "_connection",
+                staticmethod(lambda *a, **k: harness.factory("admin")),
+            ),
+            patch.object(
+                CanaryReadOnlyHTTPS,
+                "_connection",
+                staticmethod(lambda *a, **k: harness.factory("canary")),
+            ),
         ):
             result = self.cli(self.execute_args())
             self.assertEqual(result["checks"]["agent_configuration"], "PASS")

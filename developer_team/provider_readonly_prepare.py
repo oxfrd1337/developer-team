@@ -25,8 +25,16 @@ from .adapters.provider_readonly_https import AdminCredentialIdentity
 BASE = "abb3eed41c8e056c930ae3f46bf7affad741afae"
 RUNNER_SHA256 = "41136330bdc37d0695d2ad262cd13e1ba7b0e88874949daf862847673d8dbd6e"
 FIELDS = (
-    "project_id", "service_account_ref", "credential_ref", "admin_ref", "agent_id",
-    "model", "intent_id", "idempotency_key", "plan_digest", "budget_cents",
+    "project_id",
+    "service_account_ref",
+    "credential_ref",
+    "admin_ref",
+    "agent_id",
+    "model",
+    "intent_id",
+    "idempotency_key",
+    "plan_digest",
+    "budget_cents",
 )
 _ENV_MARKERS = ("KEY", "SECRET", "TOKEN", "CREDENTIAL", "PASSWORD")
 
@@ -52,16 +60,32 @@ def _environment_blocked():
 
 
 def _binding(values):
-    if any(not safe_ref(values[name]) for name in (
-        "service_account_ref", "credential_ref", "admin_ref",
-    )) or values["admin_ref"] == values["credential_ref"]:
-        raise AgentsAPIError("invalid_binding")
-    bound = CanaryBinding(**{
-        name: values[name] for name in (
-            "project_id", "agent_id", "intent_id", "idempotency_key", "plan_digest",
-            "budget_cents", "model",
+    if (
+        any(
+            not safe_ref(values[name])
+            for name in (
+                "service_account_ref",
+                "credential_ref",
+                "admin_ref",
+            )
         )
-    })
+        or values["admin_ref"] == values["credential_ref"]
+    ):
+        raise AgentsAPIError("invalid_binding")
+    bound = CanaryBinding(
+        **{
+            name: values[name]
+            for name in (
+                "project_id",
+                "agent_id",
+                "intent_id",
+                "idempotency_key",
+                "plan_digest",
+                "budget_cents",
+                "model",
+            )
+        }
+    )
     bound.validate()
     return bound
 
@@ -74,9 +98,13 @@ def _check_checkout():
     if digest != RUNNER_SHA256:
         raise AgentsAPIError("runner_changed")
     result = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", BASE, "HEAD"], cwd=root,
-        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        timeout=5, check=False,
+        ["git", "merge-base", "--is-ancestor", BASE, "HEAD"],
+        cwd=root,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=5,
+        check=False,
     )
     if result.returncode:
         raise AgentsAPIError("base_missing")
@@ -111,14 +139,18 @@ def _open_private(path):
         stack.callback(os.close, directory)
         for part in selected.parts[1:-1]:
             directory = os.open(
-                part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory,
+                part,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                dir_fd=directory,
             )
             stack.callback(os.close, directory)
         info = os.stat(selected.name, dir_fd=directory, follow_symlinks=False)
         if not stat.S_ISREG(info.st_mode):
             raise AgentsAPIError("private_readonly_file_required")
         fd = os.open(
-            selected.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory,
+            selected.name,
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+            dir_fd=directory,
         )
         stack.callback(os.close, fd)
         pin = _checked_fd(fd)
@@ -130,19 +162,31 @@ def _open_private(path):
 def _manifest(values, bound, admin_pin, canary_pin, *, now):
     # Handles are role-specific metadata, never hashes of secret bytes.
     admin = AdminCredentialIdentity(
-        bound.project_id, values["admin_ref"], "dt017c_admin",
-        bound.digest, now, now + 300,
+        bound.project_id,
+        values["admin_ref"],
+        "dt017c_admin",
+        bound.digest,
+        now,
+        now + 300,
     )
     canary = CredentialIdentity(
-        bound.project_id, values["credential_ref"], values["service_account_ref"],
-        "dt017c_canary", bound.digest, now, now + 300,
+        bound.project_id,
+        values["credential_ref"],
+        values["service_account_ref"],
+        "dt017c_canary",
+        bound.digest,
+        now,
+        now + 300,
     )
     admin.validate(bound, now)
     canary.validate(bound, now)
     return {
-        "binding": asdict(bound), "admin_identity": asdict(admin),
-        "canary_identity": asdict(canary), "admin_fd_pin": list(admin_pin),
-        "canary_fd_pin": list(canary_pin), "approved_models": [bound.model],
+        "binding": asdict(bound),
+        "admin_identity": asdict(admin),
+        "canary_identity": asdict(canary),
+        "admin_fd_pin": list(admin_pin),
+        "canary_fd_pin": list(canary_pin),
+        "approved_models": [bound.model],
     }
 
 
@@ -150,13 +194,19 @@ def _sanitize(raw):
     value = json.loads(raw, object_pairs_hook=runner._pairs)
     expected = runner._report("READ_ONLY", "BLOCKED")
     if (
-        type(value) is not dict or set(value) != set(expected)
-        or value["mode"] != "READ_ONLY" or value["outcome"] not in {"BLOCKED", "COLLECTED"}
-        or type(value["checks"]) is not dict or set(value["checks"]) != set(runner.GATES)
+        type(value) is not dict
+        or set(value) != set(expected)
+        or value["mode"] != "READ_ONLY"
+        or value["outcome"] not in {"BLOCKED", "COLLECTED"}
+        or type(value["checks"]) is not dict
+        or set(value["checks"]) != set(runner.GATES)
         or any(v not in {"PASS", runner.MISSING} for v in value["checks"].values())
-        or value["LIVE"] != "NO-GO" or type(value["real_submissions"]) is not int
-        or value["real_submissions"] != 0 or value["live_authorized"] is not False
-        or value["validation"] != expected["validation"] or value["schema_version"] != 1
+        or value["LIVE"] != "NO-GO"
+        or type(value["real_submissions"]) is not int
+        or value["real_submissions"] != 0
+        or value["live_authorized"] is not False
+        or value["validation"] != expected["validation"]
+        or value["schema_version"] != 1
     ):
         raise AgentsAPIError("invalid_runner_report")
     # Reconstruct instead of forwarding any arbitrary runner output.
@@ -167,11 +217,25 @@ def _sanitize(raw):
 
 def _invoke(root, manifest, admin_fd, canary_fd):
     completed = subprocess.run(
-        [sys.executable, "-m", "developer_team.provider_readonly_runner", "--manifest",
-         str(manifest), "--admin-fd", str(admin_fd), "--canary-fd", str(canary_fd),
-         "--execute-real-readonly"],
-        cwd=root, pass_fds=(admin_fd, canary_fd), stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=300, check=False,
+        [
+            sys.executable,
+            "-m",
+            "developer_team.provider_readonly_runner",
+            "--manifest",
+            str(manifest),
+            "--admin-fd",
+            str(admin_fd),
+            "--canary-fd",
+            str(canary_fd),
+            "--execute-real-readonly",
+        ],
+        cwd=root,
+        pass_fds=(admin_fd, canary_fd),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        timeout=300,
+        check=False,
     )
     if completed.returncode != 2 or len(completed.stdout) > 16384:
         raise AgentsAPIError("runner_failed")
@@ -218,7 +282,9 @@ def _read_field(tty, name):
 
 def _read_path(tty, role, ref):
     return _read_tty(
-        tty, f"{role} ({ref}): absoluter Pfad der vorhandenen privaten Datei: ", 4096,
+        tty,
+        f"{role} ({ref}): absoluter Pfad der vorhandenen privaten Datei: ",
+        4096,
     )
 
 
