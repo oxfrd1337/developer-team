@@ -29,12 +29,23 @@ def _approval_path():
 
 def _git(root, *args):
     result = subprocess.run(
-        ["git", "--no-optional-locks", "--no-replace-objects", "-c", "core.fsmonitor=false",
-         "-c", "core.untrackedCache=false", *args],
+        [
+            "git",
+            "--no-optional-locks",
+            "--no-replace-objects",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.untrackedCache=false",
+            *args,
+        ],
         cwd=root,
         env={key: value for key, value in os.environ.items() if not key.startswith("GIT_")},
-        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-        timeout=10, check=False,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        timeout=10,
+        check=False,
     )
     if result.returncode or len(result.stdout) > _LIMIT:
         raise _blocked()
@@ -104,8 +115,10 @@ def _inventory(root):
         mode, kind, oid = metadata.split(b" ")
         relative = name.decode("utf-8")
         if (
-            mode not in {b"100644", b"100755"} or kind != b"blob"
-            or Path(relative).is_absolute() or ".." in Path(relative).parts
+            mode not in {b"100644", b"100755"}
+            or kind != b"blob"
+            or Path(relative).is_absolute()
+            or ".." in Path(relative).parts
             or Path(relative).suffix in {".pyc", ".pyo", ".so", ".pyd", ".pth"}
         ):
             raise _blocked()

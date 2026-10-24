@@ -57,10 +57,13 @@ class PrepareTests(unittest.TestCase):
         # Business-flow fixtures have no production release approval. Integrity
         # itself is exercised with real disposable Git repositories separately.
         self.enterContext(patch.object(broker, "verify_release", return_value={}))
-        self.enterContext(patch.object(
-            broker, "verified_snapshot",
-            side_effect=lambda root: contextlib.nullcontext(root),
-        ))
+        self.enterContext(
+            patch.object(
+                broker,
+                "verified_snapshot",
+                side_effect=lambda root: contextlib.nullcontext(root),
+            )
+        )
 
     def args(self, **changes):
         result = []

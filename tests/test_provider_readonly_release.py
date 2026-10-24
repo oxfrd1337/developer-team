@@ -38,24 +38,39 @@ class ReleaseTests(unittest.TestCase):
         self.pin.write_text(json.dumps(candidate))
         self.pin.chmod(0o400)
         self.enterContext(patch.object(release, "_approval_path", return_value=self.pin))
-        self.enterContext(patch.object(
-            broker, "__file__", str(self.root / "developer_team/provider_readonly_prepare.py")
-        ))
+        self.enterContext(
+            patch.object(
+                broker, "__file__", str(self.root / "developer_team/provider_readonly_prepare.py")
+            )
+        )
 
     def git(self, *args):
         return subprocess.check_output(
-            ["git", "-c", "user.name=Synthetic", "-c",
-             "user.email=synthetic@example.invalid", *args],
-            cwd=self.root, stderr=subprocess.DEVNULL,
+            [
+                "git",
+                "-c",
+                "user.name=Synthetic",
+                "-c",
+                "user.email=synthetic@example.invalid",
+                *args,
+            ],
+            cwd=self.root,
+            stderr=subprocess.DEVNULL,
         )
 
     def blocked_before_credentials(self):
         # Both interactive selection and inherited FD validation must remain unused.
         for descriptors in ((None, None), (999998, 999999)):
             with contextlib.ExitStack() as stack:
-                guards = [stack.enter_context(patch.object(broker, name)) for name in (
-                    "_read_path", "_open_private", "_checked_fd", "_invoke",
-                )]
+                guards = [
+                    stack.enter_context(patch.object(broker, name))
+                    for name in (
+                        "_read_path",
+                        "_open_private",
+                        "_checked_fd",
+                        "_invoke",
+                    )
+                ]
                 guards.append(stack.enter_context(patch("os.dup")))
                 with self.assertRaises(AgentsAPIError):
                     broker._execute({}, binding(), *descriptors, None)
@@ -80,9 +95,12 @@ class ReleaseTests(unittest.TestCase):
 
     def test_changed_https_credential_contract_scope_and_verifier_block(self):
         for relative in (
-            "adapters/provider_readonly_https.py", "adapters/agents_https.py",
-            "adapters/agents_credentials.py", "adapters/agents_api_contracts.py",
-            "scope_evidence.py", "provider_readonly_release.py",
+            "adapters/provider_readonly_https.py",
+            "adapters/agents_https.py",
+            "adapters/agents_credentials.py",
+            "adapters/agents_api_contracts.py",
+            "scope_evidence.py",
+            "provider_readonly_release.py",
         ):
             with self.subTest(module=relative):
                 path = self.root / "developer_team" / relative
@@ -179,7 +197,8 @@ class ReleaseTests(unittest.TestCase):
     def test_real_isolated_snapshot_child_stays_offline(self):
         bound = binding()
         values = asdict(bound) | {
-            "admin_ref": "admin_synthetic", "credential_ref": "key_synthetic",
+            "admin_ref": "admin_synthetic",
+            "credential_ref": "key_synthetic",
             "service_account_ref": "sa_synthetic",
         }
         with contextlib.ExitStack() as stack:
@@ -190,9 +209,17 @@ class ReleaseTests(unittest.TestCase):
                 path.chmod(0o600)
                 handles.append(stack.enter_context(broker._open_private(str(path))))
             manifest = self.parent / "manifest.json"
-            manifest.write_text(json.dumps(broker._manifest(
-                values, bound, handles[0][1], handles[1][1], now=int(time.time()),
-            )))
+            manifest.write_text(
+                json.dumps(
+                    broker._manifest(
+                        values,
+                        bound,
+                        handles[0][1],
+                        handles[1][1],
+                        now=int(time.time()),
+                    )
+                )
+            )
             with patch.dict(os.environ, {"DT_PROVIDER_OFFLINE": "1"}):
                 report = broker._invoke(self.root, manifest, handles[0][0], handles[1][0])
             self.assertEqual(report["outcome"], "BLOCKED")
@@ -200,9 +227,11 @@ class ReleaseTests(unittest.TestCase):
             self.assertIs(report["live_authorized"], False)
 
     def test_plan_does_not_read_release_approval_or_repository(self):
-        with patch.object(broker, "_check_checkout", side_effect=AssertionError), patch(
-            "builtins.open", side_effect=AssertionError
-        ), patch("os.open", side_effect=AssertionError):
+        with (
+            patch.object(broker, "_check_checkout", side_effect=AssertionError),
+            patch("builtins.open", side_effect=AssertionError),
+            patch("os.open", side_effect=AssertionError),
+        ):
             self.assertEqual(broker.prepare([])["mode"], "PLAN")
 
 
