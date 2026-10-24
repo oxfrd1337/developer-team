@@ -198,3 +198,6 @@ einen typisierten, nichtautoritativen NO-GO-Bericht und lokale modellfreie
 Negativprobes. Kein produktiver Runner: **Live bleibt NO-GO**, auch bei grüner CI.
 Nachweise und konkrete verbleibende Betriebsblocker:
 [Validierung](docs/dt-007-validation.md).
+
+DT-017E: [Sichere Read-only-Diagnose und Betreiberanleitung](docs/dt-017e-safe-diagnostics.md).
+Reportschema 2; unabhängige Release-Freigabe bleibt erforderlich, `LIVE=NO-GO`.

@@ -181,6 +181,8 @@ def _manifest(values, bound, admin_pin, canary_pin, *, now):
 
 
 def _sanitize(raw):
+    from .provider_readonly_diagnostics import PROVIDER_GATES, sanitize_diagnostics
+
     value = json.loads(raw, object_pairs_hook=runner._pairs)
     expected = runner._report("READ_ONLY", "BLOCKED")
     if (
@@ -196,12 +198,26 @@ def _sanitize(raw):
         or value["real_submissions"] != 0
         or value["live_authorized"] is not False
         or value["validation"] != expected["validation"]
-        or value["schema_version"] != 1
+        or type(value["schema_version"]) is not int
+        or value["schema_version"] != 2
+        or value["provider_observations"] not in {"NONE_VALID", "SOME_VALID"}
     ):
         raise AgentsAPIError("invalid_runner_report")
     # Reconstruct instead of forwarding any arbitrary runner output.
     expected["outcome"] = value["outcome"]
     expected["checks"] = {key: value["checks"][key] for key in runner.GATES}
+    expected["provider_diagnostics"] = sanitize_diagnostics(value["provider_diagnostics"])
+    valid = False
+    for gate in PROVIDER_GATES:
+        passed = expected["checks"][gate] == "PASS"
+        if passed != (expected["provider_diagnostics"][gate]["code"] == "PASS"):
+            raise AgentsAPIError("invalid_runner_report")
+        valid |= passed
+    expected["provider_observations"] = "SOME_VALID" if valid else "NONE_VALID"
+    if value["provider_observations"] != expected["provider_observations"]:
+        raise AgentsAPIError("invalid_runner_report")
+    if value["outcome"] == "BLOCKED" and expected != runner._report("READ_ONLY", "BLOCKED"):
+        raise AgentsAPIError("invalid_runner_report")
     return expected
 
 

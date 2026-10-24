@@ -6,6 +6,9 @@ import math
 import os
 import re
 import stat
+import socket
+import ssl
+import http.client
 from dataclasses import dataclass
 
 from .agents_api_contracts import (
@@ -17,7 +20,8 @@ from .agents_api_contracts import (
     safe_ref,
 )
 from .agents_credentials import require_identity
-from .agents_https import FDSecretStore, HardenedHTTPS
+from .agents_https import FDSecretStore, HardenedHTTPS, ResponseTooLarge
+from ..provider_readonly_diagnostics import DiagnosticFailure, WIRE_FAILURES
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -97,6 +101,15 @@ class _ReadOnlyHTTPS(HardenedHTTPS):
     The inherited worker receives operation=None; no gate can authorize a POST.
     """
 
+    def exchange(self, request):
+        result = super().exchange(request)
+        if result.status in WIRE_FAILURES:
+            raise DiagnosticFailure(WIRE_FAILURES[result.status])
+        return result
+
+    def _accept_status(self, status):
+        return status == 200
+
     def _validate(self, request):
         if type(request) is not WireRequest:
             raise AgentsAPIError("invalid_readonly_request")
@@ -125,6 +138,24 @@ class _ReadOnlyHTTPS(HardenedHTTPS):
         return self.exchange(
             WireRequest("GET", PROVIDER_BASE + operation, headers, None, self._clock() + 5, 65536)
         )
+
+    def _failure_response(self, error):
+        # Classify by type only, never exception text (which can contain secrets).
+        if isinstance(error, TimeoutError):
+            status = -1
+        elif isinstance(error, (ssl.SSLError, http.client.HTTPException)):
+            status = -2
+        elif isinstance(error, socket.gaierror):
+            status = -3
+        elif isinstance(error, ResponseTooLarge):
+            status = -4
+        elif type(error) is AgentsAPIError and error.args == ("http_response_headers_too_large",):
+            status = -4
+        elif type(error) is AgentsAPIError and error.args == ("unsupported_proxy_configuration",):
+            status = -2
+        else:
+            status = -5
+        return WireResponse(status)
 
 
 class AdminReadOnlyHTTPS(_ReadOnlyHTTPS):

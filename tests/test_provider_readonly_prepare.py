@@ -1,6 +1,7 @@
 """DT-017C contracts with disposable synthetic files; never provider access."""
 
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -57,6 +58,10 @@ class PrepareTests(unittest.TestCase):
         # Business-flow fixtures have no production release approval. Integrity
         # itself is exercised with real disposable Git repositories separately.
         self.enterContext(patch.object(broker, "verify_release", return_value={}))
+        # Synthetic fixtures only: the production runner pin deliberately stays
+        # unchanged until independent exact-HEAD release review/provisioning.
+        self.enterContext(patch.object(broker, "RUNNER_SHA256", hashlib.sha256(
+            Path(runner.__file__).read_bytes()).hexdigest()))
         self.enterContext(
             patch.object(
                 broker,

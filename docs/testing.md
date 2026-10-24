@@ -1,5 +1,14 @@
 # Teststrategie
 
+## DT-017E
+
+`python -m unittest tests.test_provider_readonly_diagnostics -v` prüft die sichere
+Diagnose pro zugelassener GET-Operation und das strikte Reportschema 2 zusätzlich
+zur gesamten bisherigen Suite. [Deutsche Bedienung, Enums und Beispielreport](dt-017e-safe-diagnostics.md).
+Die Python-3.11–3.13-CI bleibt synthetisch. Release-Pin und Runner-SHA werden nicht
+erneuert; unabhängiger exact-HEAD-Review bleibt vor realer Erhebung zwingend.
+**real_submissions=0 · LIVE=NO-GO · live_authorized=false.**
+
 ## DT-017D
 
 `python -m unittest tests.test_provider_contract -v` ergänzt 13 credentialfreie

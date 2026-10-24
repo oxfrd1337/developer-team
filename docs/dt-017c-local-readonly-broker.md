@@ -1,5 +1,10 @@
 # DT-017C: lokaler Prepare-/Broker-Helper
 
+Aktueller Diagnosevertrag: [DT-017E](dt-017e-safe-diagnostics.md), Reportschema 2.
+Der folgende Text beschreibt die ursprüngliche DT-017C-Version. DT-017E erweitert
+den Runner; sein bisheriger SHA-Pin bleibt bewusst unverändert und blockiert reale
+Erhebungen bis zur unabhängigen Freigabe. DT-017E enthält die aktuelle Anleitung.
+
 Basis: `abb3eed41c8e056c930ae3f46bf7affad741afae` (DT-017B).
 Der Helper ersetzt das manuelle Erstellen von FD-Pins, Identitaeten und Manifest.
 Der bestehende DT-017B-Runner bleibt bytegleich. Der Helper prueft dessen SHA-256
