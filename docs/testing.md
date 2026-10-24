@@ -1,5 +1,16 @@
 # Teststrategie
 
+## DT-017D
+
+`python -m unittest tests.test_provider_contract -v` ergänzt 13 credentialfreie
+Regressionen für Defaultrolle `none` mit separat geprüftem Scope und für das
+Projekt-Hard-Limit als äußere Obergrenze bei unverändertem lokalem Canary-Budget.
+Die Tests sperren echte Sockets und prüfen Collector und ReadOnlyVerifier getrennt.
+Die vollständige bestehende Python-3.11–3.13-CI-Matrix bleibt unverändert.
+[Dokumentationsprüfung, Vertrag und Live-Blocker](dt-017d-provider-contract.md).
+**real_submissions = 0 · LIVE = NO-GO · live_authorized = false.**
+**OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**
+
 ## DT-017B
 
 `tests/test_provider_readonly_runner.py` ergänzt die DT-017A-Negativmatrix um den

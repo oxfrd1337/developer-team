@@ -92,7 +92,7 @@ class SpendEvidence:
             and value.get("interval") == "month"
             and value.get("enforcement") == {"status": "enforcing"}
             and type(value.get("threshold_amount")) is int
-            and value["threshold_amount"] == binding.budget_cents
+            and binding.budget_cents <= value["threshold_amount"] <= 100
         )
         # Delayed enforcement is never a per-request spending guarantee. DT-017's
         # independent local budget / exclusive single-canary grant stays required.
@@ -137,7 +137,8 @@ class AdminReadOnlyCollector:
         principal = owner.get("service_account")
         _require(type(principal) is dict and principal.get("id") == c.service_account_ref)
         _require(owner.get("user") is None)
-        _require(account.get("role") in {"owner", "member"})
+        # Default role is identity metadata, never proof of effective permissions.
+        _require(account.get("role") in {"owner", "member", "none"})
         _require(principal.get("role") == account["role"])
         for item in (account, key, principal):
             if "project_id" in item:

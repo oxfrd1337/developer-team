@@ -75,7 +75,7 @@ def _facts_match(check, facts, b, now, identity, route_digest):
             "effective_capabilities": sorted(MINIMAL_CAPABILITIES),
             "additional_permissions": [],
         },
-        "spend_controls": {"project_limit_cents": b.budget_cents, "enforcement_delayed": True},
+        "spend_controls": {"enforcement_delayed": True},
         "secret_store": {
             "external": True,
             "readable": True,
@@ -129,6 +129,10 @@ def _facts_match(check, facts, b, now, identity, route_digest):
         )
     if check == "real_transport" and (type(route_digest) is not str or len(route_digest) != 64):
         return False
+    if check == "spend_controls":
+        if not bounded_int(facts.get("project_limit_cents"), b.budget_cents, 100):
+            return False
+        expected["project_limit_cents"] = facts["project_limit_cents"]
     if check == "single_canary_grant":
         if not safe_ref(facts.get("grant_ref")):
             return False
