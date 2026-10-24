@@ -238,7 +238,7 @@ class PrepareTests(unittest.TestCase):
         for fault in (None, OSError(ADMIN), KeyboardInterrupt()):
             seen = []
 
-            def invoke(root, manifest, admin_fd, canary_fd):
+            def invoke(root, manifest, admin_fd, canary_fd, *, seen=seen, fault=fault):
                 seen.append((manifest, admin_fd, canary_fd))
                 value, bound, identity, admin = runner._manifest(manifest)
                 runner.ExternalFD(admin_fd, admin, tuple(value["admin_fd_pin"])).validate(admin)
@@ -361,13 +361,13 @@ class PrepareTests(unittest.TestCase):
                     if not chunk:
                         break
                     output += chunk
-                    if b"Datei: " in output and not sent:
-                        # Wait for echo to actually be disabled before sending.
-                        import termios
+                if b"Datei: " in output and not sent:
+                    # Wait for echo to actually be disabled before sending.
+                    import termios
 
-                        if not termios.tcgetattr(master)[3] & termios.ECHO:
-                            os.write(master, (str(self.paths[0]) + "\n").encode())
-                            sent = True
+                    if not termios.tcgetattr(master)[3] & termios.ECHO:
+                        os.write(master, (str(self.paths[0]) + "\n").encode())
+                        sent = True
             waited, status = os.waitpid(pid, os.WNOHANG)
             if waited == 0:
                 os.kill(pid, 9)
