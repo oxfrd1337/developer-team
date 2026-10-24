@@ -208,10 +208,19 @@ Aufgabenreferenz nennen; nächste Operatorentscheidung anfragen, keine Freigabe 
 - `main.protected=false`, unbestätigte Host-/Rollenisolierung, Remote-Stopp, harte Budgets
   und fehlender Deployment-Nachweis bleiben ausdrücklich offene Sicherheitsgrenzen.
   Dieses Runbook ändert keine Branch Protection oder Berechtigungen.
-- Eine denkbare Ausnahme für einen rein synthetischen Code-Merge ist ausschließlich eine
-  neue externe, explizite Betreiberentscheidung mit konkretem Umfang, Risiken, PR und SHA.
-  Der Helfer bleibt dabei BLOCKED; er verarbeitet keine Ausnahme oder Freigabetokens.
-  Das ist keine Cloud-/Produktionsfreigabe. Ohne separate Entscheidung kein Merge.
+- Für **ausschließlich manuelle Offline-Quellcode-Merges** kann eine explizite
+  Einzelbetreiberentscheidung nach dem [DT-018-Governance-Verfahren](dt-018-single-operator-offline-merge.md)
+  die fehlende *formale GitHub-Revieweridentitätstrennung* als Restrisiko akzeptieren,
+  sofern zwei eigenständig technisch erfolgreiche, getrennte QA-/Security-Aufgaben
+  vorliegen. `UNSUPPORTED` bleibt `UNSUPPORTED`; keine Umdeutung in PASS.
+  Das Verfahren erfordert für jeden konkreten PR, Basis, HEAD, Umfang und Risiken
+  eine **gesonderte** dokumentierte Entscheidung; geschützte Steuerungskomponenten
+  benötigen eine besonders begründete manuelle Sicherheitsprüfung.
+  **DT-018 gilt erst nach manueller Übernahme seiner Governance-Änderung; die
+  Änderung darf sich nicht selbst freigeben.** Unbekannte GitHub-Schutzregeln,
+  technische Pflicht-Fails, neue SHA oder geänderte Basis stoppen.
+  Der Helfer bleibt immer BLOCKED, er verarbeitet keine Ausnahmen oder Tokens.
+  Dies ist keine automatische Merge-, Cloud-, Provider-/Runtime- oder Live-Freigabe.
 
 Unmittelbar vor einer später separat autorisierten manuellen GitHub-Aktion erneut den
 aktuellen PR-HEAD, Basis, Dateiliste und CI/Reviews vergleichen. Jede Abweichung: STOP.
