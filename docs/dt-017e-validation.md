@@ -44,12 +44,23 @@ python -m developer_team validate examples/project.synthetic.toml
 python -m developer_team demo --scenario test-fix --output work/dt017e-smoke
 ```
 
+Der deutsche JSON-Beispielreport besteht die strikte Schema-2-Brokerprüfung.
 Konfigurationsprüfung und synthetischer Smoke bestehen; der Smoke bleibt erwartbar
 BLOCKED mit manuellen Merge-/Release-Blockern. Die vollständige Suite besteht lokal unter Python 3.12 und 3.13 mit jeweils
-726 Tests (35,1 bzw. 35,2 Sekunden). Abschließende CI-Ergebnisse stehen im Draft-PR.
+726 Tests (33,8 bzw. 33,6 Sekunden). Abschließende CI-Ergebnisse stehen im Draft-PR.
 Die lokale Installation von Ruff/Coverage/Build wurde durch HTTP-Proxy-403 blockiert;
 diese Prüfungen werden deshalb in der vorhandenen gepinnten GitHub-CI ausgeführt.
 Es wurde keine Netzsperre umgangen. Python 3.11 wird durch CI geprüft.
+
+Die [CI zum Implementierungsstand](https://github.com/oxfrd1337/developer-team/actions/runs/40137491965)
+(Commit `3824e4497551c8fbd1a7f57986bdc8b50fa14c62`) besteht alle sechs Jobs.
+Python 3.11, 3.12 und 3.13 führen jeweils 726 Tests aus, mit einem bestehenden
+Bubblewrap-/Namespace-Skip je Job. Dieser Skip ist fehlende Isolationsevidence,
+kein positiver Sicherheitsnachweis und keine Erlaubnis für einen Host-Fallback.
+Branch-Coverage beträgt jeweils 91 %. Ruff/Security/Format, Wheel/SDist,
+synthetischer Smoke, credentialfreie CLI-Hilfe-Probe und Checkpoint/Restore bestehen.
+Nachfolgende Dokumentationskorrekturen ändern keinen Implementierungscode;
+der finale CI-Run und sein exact-HEAD werden zusätzlich im Draft-PR festgehalten.
 
 Die unveränderte CI prüft Python 3.11–3.13, Ruff einschließlich Security-Regeln,
 Format, Branch-Coverage >=80 %, Build, synthetischen Smoke und Checkpoint/Restore.
