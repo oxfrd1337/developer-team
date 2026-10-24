@@ -5,9 +5,12 @@ from __future__ import annotations
 import math
 import os
 import re
+import socket
+import ssl
 import stat
 from dataclasses import dataclass
 
+from ..provider_readonly_diagnostics import DiagnosticError
 from .agents_api_contracts import (
     PROVIDER_BASE,
     AgentsAPIError,
@@ -118,13 +121,41 @@ class _ReadOnlyHTTPS(HardenedHTTPS):
         self._validate_identity()
         return request.url[len(PROVIDER_BASE) :], None
 
+    def _safe_failure(self, error):
+        if isinstance(error, TimeoutError):
+            return "TIMEOUT"
+        if isinstance(error, socket.gaierror):
+            return "DNS_FAILURE"
+        if isinstance(error, ssl.SSLError) or (isinstance(error, OSError) and self._proxy):
+            return "TLS_OR_PROXY_FAILURE"
+        if type(error) is AgentsAPIError and error.args == ("unsupported_proxy_configuration",):
+            return "TLS_OR_PROXY_FAILURE"
+        if type(error) is AgentsAPIError and error.args in (
+            ("http_response_body_too_large",), ("http_response_headers_too_large",)
+        ):
+            return "RESPONSE_TOO_LARGE"
+        return "TRANSPORT_FAILURE"
+
+    def _transport_failure(self, code):
+        # Called only by the waiting caller, never by a late daemon worker.
+        self._last_failure = code
+
     def read(self, operation):
         paths, headers = self._allowed()
         if operation not in paths:
             raise AgentsAPIError("readonly_operation_blocked")
-        return self.exchange(
-            WireRequest("GET", PROVIDER_BASE + operation, headers, None, self._clock() + 5, 65536)
-        )
+        self._last_failure = "LOCAL_VALIDATION_FAILED"
+        response = None
+        try:
+            response = self.exchange(
+                WireRequest("GET", PROVIDER_BASE + operation, headers, None, self._clock() + 5, 65536)
+            )
+        except Exception:
+            pass
+        if response is None:
+            # Outside the handler: never chain a credential/transport exception.
+            raise DiagnosticError(self._last_failure)
+        return response
 
 
 class AdminReadOnlyHTTPS(_ReadOnlyHTTPS):

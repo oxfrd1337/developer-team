@@ -1,6 +1,7 @@
 """Synthetic external approvals; real disposable Git repos, never credentials."""
 
 import contextlib
+import hashlib
 import json
 import os
 import subprocess
@@ -13,12 +14,17 @@ from unittest.mock import patch
 
 from developer_team import provider_readonly_prepare as broker
 from developer_team import provider_readonly_release as release
+from developer_team import provider_readonly_runner as runner
 from developer_team.adapters.agents_api_contracts import AgentsAPIError
 from tests.agents_api_support import binding
 
 
 class ReleaseTests(unittest.TestCase):
     def setUp(self):
+        # Synthetic fixture approval only. Production RUNNER_SHA256 stays unchanged;
+        # the revised runner is deliberately blocked pending independent review.
+        fixture_digest = hashlib.sha256(Path(runner.__file__).read_bytes()).hexdigest()
+        self.enterContext(patch.object(broker, "RUNNER_SHA256", fixture_digest))
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.parent = Path(self.tmp.name).resolve()

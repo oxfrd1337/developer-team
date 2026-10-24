@@ -1,5 +1,13 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
+## DT-017E: sichere Read-only-Diagnosen
+
+Der Runner meldet feste Fehlercodes und GET-Prüfstufen für die drei
+providerprüfbaren Gates; Schema 2 unterscheidet einen Erhebungsversuch mit null
+akzeptierten Observations. [Vertrag, Betreiberanleitung und Beispielreport](docs/dt-017e-safe-diagnostics.md).
+Runner-SHA und externer Release-Pin werden nicht erneuert; reale Erhebung bleibt
+ausdrücklich gesperrt. **real_submissions=0 · LIVE=NO-GO.**
+
 ## DT-017C: lokaler Prepare-/Broker-Helper
 
 [Mac-Ablauf und sichere Rollenbindung](docs/dt-017c-local-readonly-broker.md):

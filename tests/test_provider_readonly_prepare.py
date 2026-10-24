@@ -1,6 +1,7 @@
 """DT-017C contracts with disposable synthetic files; never provider access."""
 
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -34,6 +35,10 @@ CANARY = SYNTHETIC_SECRET
 
 class PrepareTests(unittest.TestCase):
     def setUp(self):
+        # Synthetic fixture approval only. Production RUNNER_SHA256 stays unchanged;
+        # the revised runner is deliberately blocked pending independent review.
+        fixture_digest = hashlib.sha256(Path(runner.__file__).read_bytes()).hexdigest()
+        self.enterContext(patch.object(broker, "RUNNER_SHA256", fixture_digest))
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name).resolve()
@@ -355,7 +360,7 @@ class PrepareTests(unittest.TestCase):
                 result = broker._execute(self.values, binding(), *self.fds, None)
         self.assertEqual(result, runner._report("READ_ONLY", "BLOCKED"))
 
-    def test_broker_manifest_drives_unchanged_runner_only_six_synthetic_gets(self):
+    def test_broker_manifest_drives_runner_only_six_synthetic_gets(self):
         harness = Harness()
 
         def invoke(root, manifest, admin_fd, canary_fd):

@@ -1,5 +1,12 @@
 # DT-017C: lokaler Prepare-/Broker-Helper
 
+Aktueller Stand DT-017E: [Schema 2 und sichere Diagnosen](dt-017e-safe-diagnostics.md).
+Die folgenden Beschreibungen des bytegleichen/unveränderten DT-017B-Runners sind
+historischer DT-017C-Stand. Der Diagnose-Runner ist geändert; seine bisherige
+Produktions-SHA bleibt unverändert und blockiert reale Erhebungen bis zur separaten
+unabhängigen Freigabe. `COLLECTED` bedeutet nur Erhebungsversuch; entscheidend ist
+zusätzlich `provider_observations` (0–3). Keine Live-Freigabe.
+
 Basis: `abb3eed41c8e056c930ae3f46bf7affad741afae` (DT-017B).
 Der Helper ersetzt das manuelle Erstellen von FD-Pins, Identitaeten und Manifest.
 Der bestehende DT-017B-Runner bleibt bytegleich. Der Helper prueft dessen SHA-256

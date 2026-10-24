@@ -302,6 +302,14 @@ class HardenedHTTPS:
             raise AgentsAPIError("https_exchange_failed_reconcile_required")
         return result
 
+    def _safe_failure(self, error):
+        # Read-only subclasses may classify by type, never exception text.
+        return None
+
+    def _transport_failure(self, code):
+        # No change to mutation transport diagnostics or authority.
+        pass
+
     def _bounded(self, request, path, operation, authorization):
         if (
             type(authorization) is not str
@@ -329,6 +337,7 @@ class HardenedHTTPS:
 
         def worker():
             response = None
+            failure = None
             conn = None
             try:
                 conn = self._factory(min(self._connect_timeout, remaining))
@@ -370,10 +379,11 @@ class HardenedHTTPS:
                             break
                         size += len(chunk)
                         if size > request.max_response_bytes:
-                            raise ValueError
+                            raise AgentsAPIError("http_response_body_too_large")
                         chunks.append(chunk)
                     response = WireResponse(raw.status, b"".join(chunks))
-            except Exception:
+            except Exception as error:
+                failure = self._safe_failure(error)
                 response = None
             finally:
                 connected.set()  # Wake the caller on an early connect failure, too.
@@ -382,20 +392,26 @@ class HardenedHTTPS:
                         conn.close()
                     except Exception:
                         response = None
-                results.put(response)
+                results.put((response, failure))
 
         threading.Thread(target=worker, daemon=True).start()
         result = None
         try:
             if not connected.wait(timeout=max(0, connect_deadline - self._clock())):
+                self._transport_failure("TIMEOUT")
                 raise AgentsAPIError("https_connect_deadline_exceeded")
-            result = results.get(
+            result, failure = results.get(
                 timeout=max(0, min(self._read_timeout, request.deadline - self._clock()))
             )
+            if type(result) is not WireResponse:
+                self._transport_failure(failure or "TRANSPORT_FAILURE")
         except queue.Empty:
+            self._transport_failure("TIMEOUT")
             result = None
         finally:
             abort()
+        if self._clock() >= request.deadline:
+            self._transport_failure("TIMEOUT")
         if self._clock() >= request.deadline or type(result) is not WireResponse:
             raise AgentsAPIError("https_failed_or_timeout_reconcile_required")
         return result

@@ -17,6 +17,7 @@ from developer_team.adapters.agents_api_contracts import AgentsAPIError
 from developer_team.adapters.agents_https import FDSecretStore
 from developer_team.adapters.provider_readonly_https import AdminReadOnlyHTTPS, CanaryReadOnlyHTTPS
 from developer_team.provider_readonly_runner import ExternalFD, main, run_readonly
+from developer_team.provider_readonly_diagnostics import valid_diagnostics
 from tests.acceptance_support import SYNTHETIC_SECRET
 from tests.provider_readonly_support import ADMIN_MARKER, Harness, admin_identity
 
@@ -77,6 +78,9 @@ class RunnerTests(unittest.TestCase):
         return result
 
     def assert_halt(self, report):
+        self.assertTrue(valid_diagnostics(
+            report["provider_diagnostics"], report["checks"], report["provider_observations"]
+        ))
         self.assertEqual(report["real_submissions"], 0)
         self.assertEqual(report["LIVE"], "NO-GO")
         self.assertIs(report["live_authorized"], False)

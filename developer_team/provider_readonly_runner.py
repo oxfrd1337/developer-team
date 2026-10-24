@@ -20,6 +20,7 @@ from .provider_readonly import (
     CanaryReadOnlyCollector,
     ProviderReadOnlyCollector,
 )
+from .provider_readonly_diagnostics import PROVIDER_GATES, empty_diagnostics
 
 MISSING = "MISSING_OR_INVALID"
 GATES = ACCOUNT_CHECKS + ("durable_journal", "fresh_create_approval", "fresh_submit_approval")
@@ -71,10 +72,12 @@ class ExternalFD:
 
 def _report(mode, outcome):
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "mode": mode,
         "outcome": outcome,
         "checks": dict.fromkeys(GATES, MISSING),
+        "provider_diagnostics": empty_diagnostics(),
+        "provider_observations": 0,
         "LIVE": "NO-GO",
         "real_submissions": 0,
         "live_authorized": False,
@@ -160,6 +163,10 @@ def run_readonly(
         for name, observation in observations.items():
             if final - 300 <= observation.observed_at <= final < observation.expires_at:
                 report["checks"][name] = checks[name]
+        report["provider_diagnostics"] = collector.diagnostics(report["checks"])
+        report["provider_observations"] = sum(
+            report["checks"][gate] == "PASS" for gate in PROVIDER_GATES
+        )
         report["outcome"] = "COLLECTED"
     except Exception:
         # No exception text, provider body, headers, secret digest or traceback.

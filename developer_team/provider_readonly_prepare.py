@@ -21,6 +21,7 @@ from .adapters.agents_api_contracts import AgentsAPIError, CanaryBinding, safe_r
 from .adapters.agents_credentials import CredentialIdentity
 from .adapters.agents_https import FDSecretStore
 from .adapters.provider_readonly_https import AdminCredentialIdentity
+from .provider_readonly_diagnostics import PROVIDER_GATES, valid_diagnostics
 from .provider_readonly_release import verified_snapshot, verify_release
 
 RUNNER_SHA256 = "41136330bdc37d0695d2ad262cd13e1ba7b0e88874949daf862847673d8dbd6e"
@@ -187,21 +188,35 @@ def _sanitize(raw):
         type(value) is not dict
         or set(value) != set(expected)
         or value["mode"] != "READ_ONLY"
+        or type(value["outcome"]) is not str
         or value["outcome"] not in {"BLOCKED", "COLLECTED"}
         or type(value["checks"]) is not dict
         or set(value["checks"]) != set(runner.GATES)
-        or any(v not in {"PASS", runner.MISSING} for v in value["checks"].values())
+        or any(type(v) is not str or v not in {"PASS", runner.MISSING}
+               for v in value["checks"].values())
         or value["LIVE"] != "NO-GO"
         or type(value["real_submissions"]) is not int
         or value["real_submissions"] != 0
         or value["live_authorized"] is not False
         or value["validation"] != expected["validation"]
-        or value["schema_version"] != 1
+        or type(value["schema_version"]) is not int
+        or value["schema_version"] != 2
+        or not valid_diagnostics(value["provider_diagnostics"], value["checks"],
+                                 value["provider_observations"])
+        or (value["outcome"] == "BLOCKED" and (
+            any(v != runner.MISSING for v in value["checks"].values())
+            or value["provider_diagnostics"] != expected["provider_diagnostics"]
+        ))
     ):
         raise AgentsAPIError("invalid_runner_report")
     # Reconstruct instead of forwarding any arbitrary runner output.
     expected["outcome"] = value["outcome"]
     expected["checks"] = {key: value["checks"][key] for key in runner.GATES}
+    expected["provider_diagnostics"] = {
+        gate: {key: value["provider_diagnostics"][gate][key] for key in ("code", "stage")}
+        for gate in PROVIDER_GATES
+    }
+    expected["provider_observations"] = value["provider_observations"]
     return expected
 
 

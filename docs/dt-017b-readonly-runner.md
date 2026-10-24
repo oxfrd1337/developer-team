@@ -1,5 +1,12 @@
 # DT-017B: lokaler Read-only-Evidence-Runner
 
+Aktueller Stand DT-017E: [Schema 2 und sichere Diagnosen](dt-017e-safe-diagnostics.md).
+Die folgenden Beschreibungen des bytegleichen/unveränderten DT-017B-Runners sind
+historischer DT-017C-Stand. Der Diagnose-Runner ist geändert; seine bisherige
+Produktions-SHA bleibt unverändert und blockiert reale Erhebungen bis zur separaten
+unabhängigen Freigabe. `COLLECTED` bedeutet nur Erhebungsversuch; entscheidend ist
+zusätzlich `provider_observations` (0–3). Keine Live-Freigabe.
+
 Basis ist `f74a27d264988149c8125239870637627896c6a1` (DT-017A).
 Der One-shot-Runner verwendet dessen getrennte Admin-/Canary-Collector und den
 unabhängigen Scope-Verifier. Er besitzt keinen AcceptanceController, keine

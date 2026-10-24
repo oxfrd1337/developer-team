@@ -1,5 +1,16 @@
 # Teststrategie
 
+## DT-017E
+
+`python -m unittest tests.test_provider_readonly_diagnostics -v` prüft die feste
+Diagnosematrix an allen sechs bisherigen GET-Stufen, Schemafehler, Drift, fehlende
+Records, Budget, HTTP/Redirect/DNS/TLS/Proxy/Timeout und Größenlimits sowie die
+strikte Broker-Sanitisierung, Rollen-FD-Sperren und ausbleibende Secret-Ausgaben.
+Alle Providerantworten und Credentials sind synthetisch, echte Sockets gesperrt.
+Die vollständige bisherige Python-3.11–3.13-CI bleibt zusätzlich aktiv.
+[Schema 2, Bedienung und Freigabeblocker](dt-017e-safe-diagnostics.md).
+**real_submissions=0 · LIVE=NO-GO · live_authorized=false.**
+
 ## DT-017D
 
 `python -m unittest tests.test_provider_contract -v` ergänzt 13 credentialfreie
