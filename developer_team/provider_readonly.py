@@ -55,7 +55,7 @@ def _get(transport, path):
             parse_constant=lambda _: _require(False),
         )
     except Exception:
-        pass
+        value = None
     if type(value) is not dict:
         raise DiagnosticError("SCHEMA_MISMATCH")
     return value
@@ -143,7 +143,8 @@ class AdminReadOnlyCollector(_StagedCollector):
         )
         _require(account.get("object") == "organization.project.service_account")
         key = _record(
-            self._get(root + "/api_keys?owner_project_access=any", "ADMIN_API_KEYS"), c.credential_ref
+            self._get(root + "/api_keys?owner_project_access=any", "ADMIN_API_KEYS"),
+            c.credential_ref,
         )
         _require(
             key.get("object") == "organization.project.api_key"
@@ -176,7 +177,9 @@ class AdminReadOnlyCollector(_StagedCollector):
     def spend(self):
         self._validate()
         b = self._binding
-        value = self._get(f"/v1/organization/projects/{b.project_id}/spend_limit", "ADMIN_SPEND_LIMIT")
+        value = self._get(
+            f"/v1/organization/projects/{b.project_id}/spend_limit", "ADMIN_SPEND_LIMIT"
+        )
         evidence = SpendEvidence.from_provider(value, b)
         self._validate()
         return {
@@ -345,7 +348,7 @@ class ProviderReadOnlyCollector:
         except DiagnosticError as error:
             failure = error.code
         except Exception:
-            pass
+            observation = None
         if provider_gate:
             stage = role._stage if type(role) in {
                 AdminReadOnlyCollector, CanaryReadOnlyCollector

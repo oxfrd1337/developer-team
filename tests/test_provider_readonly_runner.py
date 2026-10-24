@@ -16,8 +16,8 @@ from unittest.mock import patch
 from developer_team.adapters.agents_api_contracts import AgentsAPIError
 from developer_team.adapters.agents_https import FDSecretStore
 from developer_team.adapters.provider_readonly_https import AdminReadOnlyHTTPS, CanaryReadOnlyHTTPS
-from developer_team.provider_readonly_runner import ExternalFD, main, run_readonly
 from developer_team.provider_readonly_diagnostics import valid_diagnostics
+from developer_team.provider_readonly_runner import ExternalFD, main, run_readonly
 from tests.acceptance_support import SYNTHETIC_SECRET
 from tests.provider_readonly_support import ADMIN_MARKER, Harness, admin_identity
 

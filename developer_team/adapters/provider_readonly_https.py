@@ -148,10 +148,12 @@ class _ReadOnlyHTTPS(HardenedHTTPS):
         response = None
         try:
             response = self.exchange(
-                WireRequest("GET", PROVIDER_BASE + operation, headers, None, self._clock() + 5, 65536)
+                WireRequest(
+                    "GET", PROVIDER_BASE + operation, headers, None, self._clock() + 5, 65536
+                )
             )
         except Exception:
-            pass
+            response = None
         if response is None:
             # Outside the handler: never chain a credential/transport exception.
             raise DiagnosticError(self._last_failure)

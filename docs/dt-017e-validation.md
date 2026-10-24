@@ -10,7 +10,7 @@ Der Draft-PR enthält zusätzlich den abschließenden CI-Status mit Run-Link.
 
 ## Testnachweise
 
-15 neue synthetische Regressionstests mit zahlreichen Matrix-Unterfällen:
+16 neue synthetische Regressionstests mit zahlreichen Matrix-Unterfällen:
 
 - Alle sechs bisherigen Operationen mit 401/403/429/500/599, vier Redirectklassen,
   404 und unerwartetem 201; erste Fehlerstufe, kein Retry, keine neue Operation.
@@ -45,8 +45,8 @@ python -m developer_team demo --scenario test-fix --output work/dt017e-smoke
 ```
 
 Konfigurationsprüfung und synthetischer Smoke bestehen; der Smoke bleibt erwartbar
-BLOCKED mit manuellen Merge-/Release-Blockern. Die vollständige Suite umfasst
-725 Tests je Python-Version. Abschließende Ergebnisse stehen im Draft-PR.
+BLOCKED mit manuellen Merge-/Release-Blockern. Die vollständige Suite besteht lokal unter Python 3.12 und 3.13 mit jeweils
+726 Tests (35,1 bzw. 35,2 Sekunden). Abschließende CI-Ergebnisse stehen im Draft-PR.
 Die lokale Installation von Ruff/Coverage/Build wurde durch HTTP-Proxy-403 blockiert;
 diese Prüfungen werden deshalb in der vorhandenen gepinnten GitHub-CI ausgeführt.
 Es wurde keine Netzsperre umgangen. Python 3.11 wird durch CI geprüft.

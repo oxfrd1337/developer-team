@@ -3,8 +3,8 @@
 import contextlib
 import io
 import json
-import socket
 import queue
+import socket
 import ssl
 import unittest
 from dataclasses import replace
@@ -19,8 +19,8 @@ from developer_team.provider_readonly_diagnostics import (
     empty_diagnostics,
     valid_diagnostics,
 )
-from tests.provider_readonly_support import ADMIN_MARKER, Connection
 from tests import test_provider_readonly_runner as runner_fixtures
+from tests.provider_readonly_support import ADMIN_MARKER, Connection
 
 
 class DiagnosticTests(unittest.TestCase):
@@ -45,7 +45,10 @@ class DiagnosticTests(unittest.TestCase):
         return [
             ("account_project_binding", "ADMIN_PROJECT", root),
             ("account_project_binding", "ADMIN_SERVICE_ACCOUNTS", root + "/service_accounts"),
-            ("account_project_binding", "ADMIN_API_KEYS", root + "/api_keys?owner_project_access=any"),
+            (
+                "account_project_binding", "ADMIN_API_KEYS",
+                root + "/api_keys?owner_project_access=any",
+            ),
             ("spend_controls", "ADMIN_SPEND_LIMIT", root + "/spend_limit"),
             ("agent_configuration", "CANARY_MODELS", "/v1/models"),
             ("agent_configuration", "CANARY_AGENT", f"/v1/agents/{self.h.bound.agent_id}"),
@@ -107,6 +110,27 @@ class DiagnosticTests(unittest.TestCase):
             })
         self.assertEqual(len(self.h.calls), 3)
 
+    def test_transport_and_size_failure_at_each_operation_keep_exact_stage(self):
+        original = Connection.getresponse
+        for gate, stage, path in self.operations():
+            for error, code in (
+                (ssl.SSLError(ADMIN_MARKER), "TLS_OR_PROXY_FAILURE"),
+                (TimeoutError(ADMIN_MARKER), "TIMEOUT"),
+                (AgentsAPIError("http_response_headers_too_large"), "RESPONSE_TOO_LARGE"),
+            ):
+                def fail_at_stage(conn, path=path, error=error):
+                    if conn.path == path:
+                        raise error
+                    return original(conn)
+                with self.subTest(stage=stage, code=code), patch.object(
+                    Connection, "getresponse", fail_at_stage
+                ):
+                    result = self.collect()
+                self.assertEqual(result["provider_diagnostics"][gate], {
+                    "code": code, "stage": stage,
+                })
+                self.assertEqual(result["provider_observations"], 2)
+
     def test_schema_matrix_identifies_each_operation(self):
         for gate, stage, path in self.operations():
             original = self.h.responses[path]
@@ -154,7 +178,9 @@ class DiagnosticTests(unittest.TestCase):
                 self.h.fault = error
                 result = self.collect()
                 self.assertEqual(result["provider_observations"], 0)
-                self.assertEqual({v["code"] for v in result["provider_diagnostics"].values()}, {code})
+                self.assertEqual(
+                    {v["code"] for v in result["provider_diagnostics"].values()}, {code}
+                )
                 self.assertEqual(self.h.calls, [])
 
     def test_caller_connect_and_read_deadlines_are_timeouts(self):
@@ -196,7 +222,9 @@ class DiagnosticTests(unittest.TestCase):
             with self.subTest(code=code, size=len(body)):
                 self.h.body = body
                 result = self.collect()
-                self.assertEqual({v["code"] for v in result["provider_diagnostics"].values()}, {code})
+                self.assertEqual(
+                    {v["code"] for v in result["provider_diagnostics"].values()}, {code}
+                )
                 self.assertEqual(result["provider_observations"], 0)
 
     def test_fd_role_swap_has_no_provider_diagnostic_or_connection(self):
