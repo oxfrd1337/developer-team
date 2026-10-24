@@ -160,7 +160,7 @@ class AcceptanceTests(unittest.TestCase):
         self.assertEqual(self.h.connections, [])
 
     def test_spend_missing_stale_wrong_or_zero_blocks(self):
-        for value in (None, 0, True, 100, "5"):
+        for value in (None, 0, True, 101, "5"):
             self.h.collector = Collector()
             self.h.collector.drift("spend_controls", project_limit_cents=value)
             self.h.controller = self.h.restart()

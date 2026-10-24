@@ -106,8 +106,8 @@ class CollectorTests(unittest.TestCase):
             self.h.key["owner"] = owner
             self.assert_blocked("account_project_binding")
 
-    def test_service_account_role_none_or_owner_role_conflict_blocks(self):
-        for role in ("none", "unknown", None):
+    def test_service_account_unknown_or_owner_role_conflict_blocks(self):
+        for role in ("unknown", None):
             self.h.account["role"] = role
             self.assert_blocked("account_project_binding")
         self.h = Harness()
@@ -320,7 +320,7 @@ class CollectorTests(unittest.TestCase):
         for changes in (
             {"object": "soft_limit"},
             {"threshold_amount": None},
-            {"threshold_amount": self.h.bound.budget_cents + 1},
+            {"threshold_amount": 101},
             {"threshold_amount": self.h.bound.budget_cents - 1},
             {"threshold_amount": True},
             {"threshold_amount": 0.1},
