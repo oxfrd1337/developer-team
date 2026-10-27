@@ -20,6 +20,7 @@ from .provider_readonly import (
     CanaryReadOnlyCollector,
     ProviderReadOnlyCollector,
 )
+from .provider_readonly_diagnostics import PROVIDER_GATES, empty_diagnostics
 
 MISSING = "MISSING_OR_INVALID"
 GATES = ACCOUNT_CHECKS + ("durable_journal", "fresh_create_approval", "fresh_submit_approval")
@@ -59,7 +60,7 @@ class ExternalFD:
                     FDSecretStore._file_identity(info) == self.snapshot
                     and stat.S_ISREG(info.st_mode)
                     and info.st_uid == os.geteuid()
-                    and not info.st_mode & 0o077
+                    and stat.S_IMODE(info.st_mode) == 0o600
                     and 1 <= info.st_size <= 512
                     and fcntl.fcntl(self.descriptor, fcntl.F_GETFL) & os.O_ACCMODE == os.O_RDONLY
                 )
@@ -71,10 +72,12 @@ class ExternalFD:
 
 def _report(mode, outcome):
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "mode": mode,
         "outcome": outcome,
         "checks": dict.fromkeys(GATES, MISSING),
+        "provider_diagnostics": empty_diagnostics(),
+        "provider_observations": "NONE_VALID",
         "LIVE": "NO-GO",
         "real_submissions": 0,
         "live_authorized": False,
@@ -161,6 +164,18 @@ def run_readonly(
             if final - 300 <= observation.observed_at <= final < observation.expires_at:
                 report["checks"][name] = checks[name]
         report["outcome"] = "COLLECTED"
+        report["provider_diagnostics"] = collector.diagnostics()
+        for name in PROVIDER_GATES:
+            if (
+                report["checks"][name] != "PASS"
+                and report["provider_diagnostics"][name]["code"] == "PASS"
+            ):
+                report["provider_diagnostics"][name] = {
+                    "stage": "FINAL_VALIDATION",
+                    "code": "OBSERVATION_INVALID",
+                }
+        if any(report["checks"][name] == "PASS" for name in PROVIDER_GATES):
+            report["provider_observations"] = "SOME_VALID"
     except Exception:
         # No exception text, provider body, headers, secret digest or traceback.
         report = _report(report["mode"], "BLOCKED")

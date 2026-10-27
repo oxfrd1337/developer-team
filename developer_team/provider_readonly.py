@@ -10,21 +10,22 @@ import json
 import time
 from dataclasses import dataclass
 
-from .adapters.agents_api_contracts import (
-    AgentsAPIError,
-    bounded_int,
-    safe_ref,
-    sha256,
-)
+from .adapters.agents_api_contracts import bounded_int, safe_ref, sha256
 from .adapters.agents_credentials import require_identity
 from .adapters.provider_readonly_https import AdminReadOnlyHTTPS, CanaryReadOnlyHTTPS
 from .agents_acceptance import ACCOUNT_CHECKS, Observation, ReadOnlyVerifier
+from .provider_readonly_diagnostics import (
+    PROVIDER_GATES,
+    WIRE_FAILURES,
+    DiagnosticFailure,
+    empty_diagnostics,
+)
 from .scope_evidence import ScopeEvidence, validate_scope_subjects
 
 
-def _require(condition):
+def _require(condition, code="SCHEMA_MISMATCH"):
     if not condition:
-        raise AgentsAPIError("provider_evidence_missing_or_invalid")
+        raise DiagnosticFailure(code)
 
 
 def _unique(pairs):
@@ -36,22 +37,42 @@ def _unique(pairs):
 
 
 def _get(transport, path):
-    value = None
     try:
         response = transport.read(path)
-        if response.status == 200:
-            value = json.loads(
-                response.body,
-                object_pairs_hook=_unique,
-                parse_constant=lambda _: _require(False),
-            )
-            if type(value) is not dict:
-                value = None
+    except DiagnosticFailure:
+        raise
     except Exception:
-        value = None
-    if value is None:
-        raise AgentsAPIError("provider_read_failed")
-    return value
+        raise DiagnosticFailure("READ_UNAVAILABLE") from None
+    status = response.status
+    if status != 200:
+        if status in WIRE_FAILURES:
+            code = WIRE_FAILURES[status]
+        elif status in {401, 403, 429}:
+            code = {401: "HTTP_401", 403: "HTTP_403", 429: "HTTP_429"}[status]
+        elif 500 <= status <= 599:
+            code = "HTTP_5XX"
+        elif 300 <= status <= 399:
+            code = "REDIRECT_BLOCKED"
+        else:
+            code = "HTTP_OTHER"
+        raise DiagnosticFailure(code)
+    try:
+        _require(type(response.body) is bytes and len(response.body) <= 65536, "RESPONSE_TOO_LARGE")
+        value = json.loads(
+            response.body, object_pairs_hook=_unique, parse_constant=lambda _: _require(False)
+        )
+        _require(type(value) is dict)
+        return value
+    except DiagnosticFailure:
+        raise
+    except Exception:
+        raise DiagnosticFailure("SCHEMA_MISMATCH") from None
+
+
+class _StagedCollector:
+    def _get(self, stage, path):
+        self._stage = stage
+        return _get(self._transport, path)
 
 
 def _record(listing, reference):
@@ -62,7 +83,7 @@ def _record(listing, reference):
     ids = [item["id"] for item in records]
     _require(len(ids) == len(set(ids)))
     matches = [item for item in records if item["id"] == reference]
-    _require(len(matches) == 1)
+    _require(len(matches) == 1, "EXPECTED_RECORD_MISSING")
     return matches[0]
 
 
@@ -92,14 +113,14 @@ class SpendEvidence:
             and value.get("interval") == "month"
             and value.get("enforcement") == {"status": "enforcing"}
             and type(value.get("threshold_amount")) is int
-            and binding.budget_cents <= value["threshold_amount"] <= 100
         )
+        _require(binding.budget_cents <= value["threshold_amount"] <= 100, "BUDGET_MISMATCH")
         # Delayed enforcement is never a per-request spending guarantee. DT-017's
         # independent local budget / exclusive single-canary grant stays required.
         return cls(value["threshold_amount"])
 
 
-class AdminReadOnlyCollector:
+class AdminReadOnlyCollector(_StagedCollector):
     def __init__(self, binding, identity, secret_store=None, *, now=time.time, **wire_options):
         self._binding, self._identity, self._now = binding, identity, now
         self._transport = AdminReadOnlyHTTPS(
@@ -117,16 +138,21 @@ class AdminReadOnlyCollector:
         expires_at = int(self._now()) + 300
         b, c = self._binding, self._identity
         root = f"/v1/organization/projects/{b.project_id}"
-        project = _get(self._transport, root)
+        project = self._get("ADMIN_PROJECT", root)
         _require(
             project.get("id") == b.project_id
             and project.get("object") == "organization.project"
             and project.get("status") == "active"
         )
-        account = _record(_get(self._transport, root + "/service_accounts"), c.service_account_ref)
+        account = _record(
+            self._get("ADMIN_SERVICE_ACCOUNTS", root + "/service_accounts"), c.service_account_ref
+        )
         _require(account.get("object") == "organization.project.service_account")
+        _require(account.get("role") in {"owner", "member", "none"})
+        expires_at = min(expires_at, _not_expired(account, int(self._now())))
         key = _record(
-            _get(self._transport, root + "/api_keys?owner_project_access=any"), c.credential_ref
+            self._get("ADMIN_API_KEYS", root + "/api_keys?owner_project_access=any"),
+            c.credential_ref,
         )
         _require(
             key.get("object") == "organization.project.api_key"
@@ -138,12 +164,12 @@ class AdminReadOnlyCollector:
         _require(type(principal) is dict and principal.get("id") == c.service_account_ref)
         _require(owner.get("user") is None)
         # Default role is identity metadata, never proof of effective permissions.
-        _require(account.get("role") in {"owner", "member", "none"})
         _require(principal.get("role") == account["role"])
         for item in (account, key, principal):
             if "project_id" in item:
                 _require(item["project_id"] == b.project_id)
             expires_at = min(expires_at, _not_expired(item, int(self._now())))
+        self._stage = "FINAL_VALIDATION"
         self._validate()
         _require(int(self._now()) < expires_at)
         facts = {
@@ -159,8 +185,11 @@ class AdminReadOnlyCollector:
     def spend(self):
         self._validate()
         b = self._binding
-        value = _get(self._transport, f"/v1/organization/projects/{b.project_id}/spend_limit")
+        value = self._get(
+            "ADMIN_SPEND_LIMIT", f"/v1/organization/projects/{b.project_id}/spend_limit"
+        )
         evidence = SpendEvidence.from_provider(value, b)
+        self._stage = "FINAL_VALIDATION"
         self._validate()
         return {
             "project_limit_cents": evidence.project_limit_cents,
@@ -168,7 +197,7 @@ class AdminReadOnlyCollector:
         }
 
 
-class CanaryReadOnlyCollector:
+class CanaryReadOnlyCollector(_StagedCollector):
     def __init__(
         self,
         binding,
@@ -191,7 +220,7 @@ class CanaryReadOnlyCollector:
         self._validate()
         b = self._binding
         _require(type(self._approved) is frozenset and b.model in self._approved)
-        models = _get(self._transport, "/v1/models")
+        models = self._get("CANARY_MODELS", "/v1/models")
         # No pagination or scope readback. Announced shutdowns block conservatively;
         # availability never constitutes permission attestation.
         _require(set(models) == {"object", "data"} and models["object"] == "list")
@@ -199,13 +228,13 @@ class CanaryReadOnlyCollector:
         _require(type(data) is list and len(data) <= 1000)
         _require(all(type(m) is dict and type(m.get("id")) is str for m in data))
         matches = [m for m in data if m["id"] == b.model]
-        _require(len(matches) == 1)
+        _require(len(matches) == 1, "EXPECTED_RECORD_MISSING")
         model = matches[0]
         required = {"id", "object", "created", "owned_by"}
         _require(required <= set(model) <= required | {"shutdown_date"})
         _require(model.get("shutdown_date") is None)
         _require(model["object"] == "model" and bounded_int(model["created"], 0, int(self._now())))
-        saved = _get(self._transport, f"/v1/agents/{b.agent_id}")
+        saved = self._get("CANARY_AGENT", f"/v1/agents/{b.agent_id}")
         expected = b.agent_configuration
         # The response resolves disabled max_concurrent_subagents to null.
         expected["multi_agent"] = {"enabled": False, "max_concurrent_subagents": None}
@@ -213,7 +242,11 @@ class CanaryReadOnlyCollector:
         _require(set(saved) <= set(expected) | metadata)
         _require(saved.get("id") == b.agent_id and saved.get("object") == "agent")
         _require(all(key in saved for key in expected))
-        _require(sha256({key: saved[key] for key in expected}) == sha256(expected))
+        _require(
+            sha256({key: saved[key] for key in expected}) == sha256(expected),
+            "CONFIGURATION_MISMATCH",
+        )
+        self._stage = "FINAL_VALIDATION"
         self._validate()
         return {
             "agent_id": b.agent_id,
@@ -252,6 +285,7 @@ class ProviderReadOnlyCollector:
         self._scope_source, self._scope_verifier = scope_source, scope_verifier
         self._attestor_pin = scope_attestor_identity
         self._verifier_pin = scope_verifier_identity
+        self._diagnostics = empty_diagnostics()
 
     def _separation(self):
         if self._admin is None or self._canary is None:
@@ -266,6 +300,12 @@ class ProviderReadOnlyCollector:
 
     def read(self, binding, check):
         observation = None
+        target = None
+        if check in PROVIDER_GATES:
+            self._diagnostics[check] = {
+                "stage": "IDENTITY_VALIDATION",
+                "code": "IDENTITY_OR_HANDLE_INVALID",
+            }
         try:
             _require(binding == self._binding)
             self._separation()
@@ -276,14 +316,20 @@ class ProviderReadOnlyCollector:
                 _require(type(self._admin) is AdminReadOnlyCollector)
                 _require(self._admin._binding == binding and self._admin._identity == c)
                 if check == "account_project_binding":
+                    target = self._admin
+                    target._stage = "IDENTITY_VALIDATION"
                     facts, provider_expiry = self._admin._account_evidence()
                     expires_at = min(expires_at, provider_expiry)
                 else:
+                    target = self._admin
+                    target._stage = "IDENTITY_VALIDATION"
                     facts = self._admin.spend()
                 expires_at = min(expires_at, self._admin._validate().expires_at)
             elif check == "agent_configuration":
                 _require(type(self._canary) is CanaryReadOnlyCollector)
                 _require(self._canary._binding == binding and self._canary._identity == c)
+                target = self._canary
+                target._stage = "IDENTITY_VALIDATION"
                 facts = self._canary.agent()
             elif check == "credential_scope":
                 self._validate_canary_handle(binding, c)
@@ -302,6 +348,8 @@ class ProviderReadOnlyCollector:
 
             else:
                 return None
+            if target is not None:
+                target._stage = "FINAL_VALIDATION"
             after = int(self._now())
             require_identity(c, binding, after)
             _require(start <= after < expires_at and after - observed_at <= 300)
@@ -314,7 +362,17 @@ class ProviderReadOnlyCollector:
                 "dt017a_provider",
                 facts,
             )
-        except Exception:
+            if check in PROVIDER_GATES:
+                self._diagnostics[check] = {"stage": "FINAL_VALIDATION", "code": "PASS"}
+        except Exception as error:
+            if check in PROVIDER_GATES:
+                stage = target._stage if target is not None else "IDENTITY_VALIDATION"
+                code = (
+                    error.code if type(error) is DiagnosticFailure else "IDENTITY_OR_HANDLE_INVALID"
+                )
+                if stage in {"IDENTITY_VALIDATION", "FINAL_VALIDATION"}:
+                    code = "IDENTITY_OR_HANDLE_INVALID"
+                self._diagnostics[check] = {"stage": stage, "code": code}
             observation = None
         return observation
 
@@ -324,10 +382,28 @@ class ProviderReadOnlyCollector:
             _require(self._canary._binding == binding and self._canary._identity == identity)
             self._canary._validate()
 
+    def diagnostics(self):
+        from .provider_readonly_diagnostics import sanitize_diagnostics
+
+        return sanitize_diagnostics(self._diagnostics)
+
     def report(self):
-        checks, _ = ReadOnlyVerifier(self).inspect(self._binding, int(self._now()), self._identity)
+        checks, observations = ReadOnlyVerifier(self).inspect(
+            self._binding, int(self._now()), self._identity
+        )
+        # Revalidate earlier observations at completion, without repeating GETs
+        # or relaxing the verifier's binding, identity or start-time checks.
+        final = int(self._now())
+        for gate, observation in observations.items():
+            if not final - 300 <= observation.observed_at <= final < observation.expires_at:
+                checks[gate] = "MISSING_OR_INVALID"
+        diagnostics = self.diagnostics()
+        for gate in PROVIDER_GATES:
+            if checks[gate] != "PASS" and diagnostics[gate]["code"] == "PASS":
+                diagnostics[gate] = {"stage": "FINAL_VALIDATION", "code": "OBSERVATION_INVALID"}
         return {
             "mode": "dt017a-readonly-provider",
+            "provider_diagnostics": diagnostics,
             "checks": {name: checks[name] for name in ACCOUNT_CHECKS},
             "real_submissions": 0,
             "live": "NO-GO",

@@ -32,6 +32,10 @@ from .agents_api_contracts import (
 from .agents_credentials import CredentialIdentity, require_identity
 
 
+class ResponseTooLarge(Exception):
+    """Internal bounded-body signal without provider data."""
+
+
 class _HeaderReader:
     def __init__(self, stream, limit):
         self._stream, self._remaining = stream, limit
@@ -354,7 +358,7 @@ class HardenedHTTPS:
                 headers["Accept-Encoding"] = "identity"
                 conn.request(request.method, path, body=request.body, headers=headers)
                 raw = conn.getresponse()
-                if type(raw.status) is not int or not 200 <= raw.status < 300:
+                if type(raw.status) is not int or not self._accept_status(raw.status):
                     # Discard all error bodies and redirect locations without reading/following.
                     response = WireResponse(raw.status if type(raw.status) is int else 0)
                 else:
@@ -370,11 +374,11 @@ class HardenedHTTPS:
                             break
                         size += len(chunk)
                         if size > request.max_response_bytes:
-                            raise ValueError
+                            raise ResponseTooLarge
                         chunks.append(chunk)
                     response = WireResponse(raw.status, b"".join(chunks))
-            except Exception:
-                response = None
+            except Exception as error:
+                response = self._failure_response(error)
             finally:
                 connected.set()  # Wake the caller on an early connect failure, too.
                 if conn is not None:
@@ -388,14 +392,26 @@ class HardenedHTTPS:
         result = None
         try:
             if not connected.wait(timeout=max(0, connect_deadline - self._clock())):
-                raise AgentsAPIError("https_connect_deadline_exceeded")
+                result = self._failure_response(TimeoutError())
+                if result is None:
+                    raise AgentsAPIError("https_connect_deadline_exceeded")
+                return result
             result = results.get(
                 timeout=max(0, min(self._read_timeout, request.deadline - self._clock()))
             )
         except queue.Empty:
-            result = None
+            result = self._failure_response(TimeoutError())
         finally:
             abort()
-        if self._clock() >= request.deadline or type(result) is not WireResponse:
+        if self._clock() >= request.deadline:
+            result = self._failure_response(TimeoutError())
+        if type(result) is not WireResponse:
             raise AgentsAPIError("https_failed_or_timeout_reconcile_required")
         return result
+
+    def _failure_response(self, error):
+        # Mutation transport keeps its existing fail-closed exception contract.
+        return None
+
+    def _accept_status(self, status):
+        return 200 <= status < 300

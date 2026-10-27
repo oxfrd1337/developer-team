@@ -181,27 +181,52 @@ def _manifest(values, bound, admin_pin, canary_pin, *, now):
 
 
 def _sanitize(raw):
+    from .provider_readonly_diagnostics import PROVIDER_GATES, sanitize_diagnostics
+
     value = json.loads(raw, object_pairs_hook=runner._pairs)
     expected = runner._report("READ_ONLY", "BLOCKED")
     if (
         type(value) is not dict
         or set(value) != set(expected)
         or value["mode"] != "READ_ONLY"
+        or type(value["outcome"]) is not str
         or value["outcome"] not in {"BLOCKED", "COLLECTED"}
         or type(value["checks"]) is not dict
         or set(value["checks"]) != set(runner.GATES)
-        or any(v not in {"PASS", runner.MISSING} for v in value["checks"].values())
+        or any(
+            type(status) is not str
+            or status not in {"PASS", runner.MISSING}
+            or (gate not in PROVIDER_GATES and status != runner.MISSING)
+            for gate, status in value["checks"].items()
+        )
         or value["LIVE"] != "NO-GO"
         or type(value["real_submissions"]) is not int
         or value["real_submissions"] != 0
         or value["live_authorized"] is not False
         or value["validation"] != expected["validation"]
-        or value["schema_version"] != 1
+        or type(value["schema_version"]) is not int
+        or value["schema_version"] != 2
+        or type(value["provider_observations"]) is not str
+        or value["provider_observations"] not in {"NONE_VALID", "SOME_VALID"}
     ):
         raise AgentsAPIError("invalid_runner_report")
+    # The official CLI has no external scope verifier or evidence for the other
+    # nine gates. Optional trusted Python scope integration is a separate path.
     # Reconstruct instead of forwarding any arbitrary runner output.
     expected["outcome"] = value["outcome"]
     expected["checks"] = {key: value["checks"][key] for key in runner.GATES}
+    expected["provider_diagnostics"] = sanitize_diagnostics(value["provider_diagnostics"])
+    valid = False
+    for gate in PROVIDER_GATES:
+        passed = expected["checks"][gate] == "PASS"
+        if passed != (expected["provider_diagnostics"][gate]["code"] == "PASS"):
+            raise AgentsAPIError("invalid_runner_report")
+        valid |= passed
+    expected["provider_observations"] = "SOME_VALID" if valid else "NONE_VALID"
+    if value["provider_observations"] != expected["provider_observations"]:
+        raise AgentsAPIError("invalid_runner_report")
+    if value["outcome"] == "BLOCKED" and expected != runner._report("READ_ONLY", "BLOCKED"):
+        raise AgentsAPIError("invalid_runner_report")
     return expected
 
 

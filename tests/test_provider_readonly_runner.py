@@ -18,7 +18,7 @@ from developer_team.adapters.agents_https import FDSecretStore
 from developer_team.adapters.provider_readonly_https import AdminReadOnlyHTTPS, CanaryReadOnlyHTTPS
 from developer_team.provider_readonly_runner import ExternalFD, main, run_readonly
 from tests.acceptance_support import SYNTHETIC_SECRET
-from tests.provider_readonly_support import ADMIN_MARKER, Harness, admin_identity
+from tests.provider_readonly_support import ADMIN_MARKER, Connection, Harness, admin_identity
 
 
 class RunnerTests(unittest.TestCase):
@@ -111,6 +111,12 @@ class RunnerTests(unittest.TestCase):
     def test_explicit_consent_exactly_six_unique_gets_no_scope_inference(self):
         report = self.run_runner()
         self.assertEqual(report["outcome"], "COLLECTED")
+        self.assertEqual(report["schema_version"], 2)
+        self.assertEqual(report["provider_observations"], "SOME_VALID")
+        for gate in ("account_project_binding", "spend_controls", "agent_configuration"):
+            self.assertEqual(
+                report["provider_diagnostics"][gate], {"stage": "FINAL_VALIDATION", "code": "PASS"}
+            )
         self.assertEqual(report["checks"]["credential_scope"], "MISSING_OR_INVALID")
         for check in ("account_project_binding", "spend_controls", "agent_configuration"):
             self.assertEqual(report["checks"][check], "PASS")
@@ -133,6 +139,25 @@ class RunnerTests(unittest.TestCase):
             with self.subTest(consent=consent):
                 self.assertEqual(self.run_runner(consent)["outcome"], "BLOCKED")
         self.assertEqual(self.h.connections, [])
+
+    def test_collector_pass_rejected_by_existing_verifier_stays_missing(self):
+        original = Connection.getresponse
+
+        def response(conn):
+            result = original(conn)
+            self.h.clock += 1
+            return result
+
+        with patch.object(Connection, "getresponse", response):
+            report = self.run_runner()
+        # The existing verifier's fixed inspect timestamp rejects observations
+        # started later. Diagnostics must not bypass it or invent an auth cause.
+        for gate in ("spend_controls", "agent_configuration"):
+            self.assertEqual(report["checks"][gate], "MISSING_OR_INVALID")
+            self.assertEqual(
+                report["provider_diagnostics"][gate],
+                {"stage": "FINAL_VALIDATION", "code": "OBSERVATION_INVALID"},
+            )
 
     def test_ci_and_secret_environment_never_execute(self):
         for name in (
@@ -206,6 +231,58 @@ class RunnerTests(unittest.TestCase):
         )
         self.assertEqual(self.h.connections, [])
 
+    def test_exact_0600_required_for_both_roles_even_with_matching_pins(self):
+        for index, role in enumerate(("admin", "canary")):
+            for mode in (0o400, 0o500, 0o700, 0o640, 0o660, 0o644, 0o1600, 0o4600):
+                with self.subTest(role=role, mode=oct(mode)):
+                    os.fchmod(self.files[index].fileno(), mode)
+                    identity = self.admin if index == 0 else self.h.identity
+                    handle = self.handle(index, identity)
+                    with patch("os.pread", side_effect=AssertionError("read forbidden")) as read:
+                        with self.assertRaises(AgentsAPIError):
+                            handle.validate(identity)
+                        self.assertEqual(
+                            self.run_runner(**{role + "_fd": handle})["outcome"], "BLOCKED"
+                        )
+                        read.assert_not_called()
+                    self.assertEqual(self.h.connections, [])
+                os.fchmod(self.files[index].fileno(), 0o600)
+                self.kw[role + "_fd"] = self.handle(index, identity)
+
+    def test_runner_final_account_expiry_still_enforced_and_broker_consistent(self):
+        from developer_team import provider_readonly_prepare as broker
+
+        original = Connection.getresponse
+        start = self.h.clock
+        self.h.account["expires_at"] = start + 2
+        for elapsed in (1, 2, 3):
+            self.h.clock = start
+            self.h.calls.clear()
+
+            def response(conn, elapsed=elapsed):
+                raw = original(conn)
+                if conn.path == f"/v1/agents/{self.h.bound.agent_id}":
+                    self.h.clock = start + elapsed
+                return raw
+
+            with self.subTest(elapsed=elapsed), patch.object(Connection, "getresponse", response):
+                report = self.run_runner()
+                self.assertEqual(broker._sanitize(json.dumps(report)), report)
+                self.assertEqual(report["outcome"], "COLLECTED")
+                self.assertEqual(report["provider_observations"], "SOME_VALID")
+                self.assertEqual(
+                    report["checks"]["account_project_binding"],
+                    "PASS" if elapsed < 2 else "MISSING_OR_INVALID",
+                )
+                self.assertEqual(
+                    report["provider_diagnostics"]["account_project_binding"],
+                    {
+                        "stage": "FINAL_VALIDATION",
+                        "code": "PASS" if elapsed < 2 else "OBSERVATION_INVALID",
+                    },
+                )
+                self.assertEqual(len(self.h.calls), 6)
+
     def test_nonregular_fd_blocked(self):
         read, write = os.pipe()
         self.addCleanup(os.close, read)
@@ -231,6 +308,11 @@ class RunnerTests(unittest.TestCase):
                 self.h.calls.clear()
                 report = self.run_runner()
                 self.assertEqual(set(report["checks"].values()), {"MISSING_OR_INVALID"})
+                self.assertEqual(report["outcome"], "COLLECTED")
+                self.assertEqual(report["provider_observations"], "NONE_VALID")
+                self.assertTrue(
+                    all(item["code"] != "PASS" for item in report["provider_diagnostics"].values())
+                )
                 self.assertEqual(len(self.h.calls), 3)
                 self.assertEqual(len(set(self.h.calls)), 3)
 

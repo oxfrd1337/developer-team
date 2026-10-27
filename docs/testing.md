@@ -1,5 +1,34 @@
 # Teststrategie
 
+## DT-017E R1 (#49)
+
+```sh
+DT_PROVIDER_OFFLINE=1 PYTHONDONTWRITEBYTECODE=1 python -m unittest tests.test_provider_readonly_diagnostics tests.test_provider_readonly_report_boundary tests.test_provider_readonly_runner -v
+DT_PROVIDER_OFFLINE=1 PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -t . -v
+```
+
+Die gezielten Regressionen prüfen finale Observationfrische vor/auf/nach Ablauf,
+neun getrennte unerlaubte PASS-Gates jeweils bei NONE_VALID und konsistentem
+SOME_VALID, alle acht erlaubten Provider-PASS-Teilmengen, BLOCKED-Invarianten,
+Schema-v2-Vokabular, unerwartete Typen, doppelte Schlüssel und Booleanverwechslung.
+Die sechs GET-Stufen klassifizieren HTTPException und die Subklassen BadStatusLine,
+IncompleteRead und RemoteDisconnected neutral als TRANSPORT_FAILURE, ohne Fehlertext.
+Direkte Admin-/Canary-Handles benötigen exakt 0600, auch bei passenden externen
+Pins; die Negativtests belegen Sperre vor pread/Verbindungsaufbau. Alle neuen
+Tests sperren echte Sockets; Modusprüfungen betreffen nur temporäre künstliche Dateien.
+Scope-/Identitätsverifier, Release-Sperren und die vollständige bisherige Suite
+bleiben verpflichtend. [Fix-Nachweis und Abnahmegrenzen](dt-017e-r1-validation.md).
+**real_submissions=0 · LIVE=NO-GO · live_authorized=false.**
+
+## DT-017E
+
+`python -m unittest tests.test_provider_readonly_diagnostics -v` prüft die sichere
+Diagnose pro zugelassener GET-Operation und das strikte Reportschema 2 zusätzlich
+zur gesamten bisherigen Suite. [Deutsche Bedienung, Enums und Beispielreport](dt-017e-safe-diagnostics.md).
+Die Python-3.11–3.13-CI bleibt synthetisch. Release-Pin und Runner-SHA werden nicht
+erneuert; unabhängiger exact-HEAD-Review bleibt vor realer Erhebung zwingend.
+**real_submissions=0 · LIVE=NO-GO · live_authorized=false.**
+
 ## DT-017D
 
 `python -m unittest tests.test_provider_contract -v` ergänzt 13 credentialfreie
