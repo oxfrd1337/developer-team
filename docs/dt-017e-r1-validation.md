@@ -1,5 +1,15 @@
 # DT-017E R1: Fix-Nachweis zu Issue #49
 
+**Historischer R1-Entwicklungsbericht vor dem finalen Merge.** Dieser Bericht
+beschreibt den damaligen Draft/Review-Halt, nicht den aktuellen GitHub-Status.
+Nach aktualisierter [QA](https://github.com/oxfrd1337/developer-team/pull/45#issuecomment-6440044175),
+[Security](https://github.com/oxfrd1337/developer-team/pull/45#pullrequestreview-5665877727) und
+[CI](https://github.com/oxfrd1337/developer-team/actions/runs/40489665893) wurde
+[PR #45](https://github.com/oxfrd1337/developer-team/pull/45) am 27.10.2026 mit
+Commit `4ec29a0ee27b0c306c65b299834679e45704c7a9` in `main` integriert.
+**Keine** reale Read-only-Erhebung oder Live-/Release-Pin-Freigabe; aktuelle
+Bedingungen: [Release-Preflight](dt-017-readonly-release-preflight.md).
+
 Einziger PR: [Draft #45](https://github.com/oxfrd1337/developer-team/pull/45).
 Bestehender Branch: `dt-017e-safe-readonly-diagnostics`.
 Ausgangs-HEAD: `749047443a9db533785073ff990ab21336e4a98e`;

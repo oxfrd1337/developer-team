@@ -1,6 +1,7 @@
 # DT-017E: sichere Diagnose fehlender Provider-Evidence
 
-Issues #44 und #49 (R1), Basis `e230ddb42fcfad624221a6ed31808b03c7ca6816`.
+Issues #44 und #49 (R1), historische Entwicklungsbasis `e230ddb42fcfad624221a6ed31808b03c7ca6816`.
+**Integrationsstatus 27.10.2026:** [PR #45](https://github.com/oxfrd1337/developer-team/pull/45) wurde technisch offline geprueft und mit `main`-Commit `4ec29a0ee27b0c306c65b299834679e45704c7a9` integriert. Keine reale Erhebung, keine unabhaengige produktive Releasefreigabe. [Aktueller Release-Preflight](dt-017-readonly-release-preflight.md).
 Der historische all-MISSING-Bericht beweist keine konkrete Ursache. Erst ein
 separat autorisierter Erhebungsversuch mit dieser Diagnoseversion kann sichere
 Fehlerklassen und die betroffene zugelassene Operation unterscheiden.
@@ -89,14 +90,17 @@ Spend- oder Agent-Mutation wird hinzugefügt.
 
 ## Betreiberanleitung: ein offizieller Diagnoseaufruf
 
-**In diesem Draft nicht ausführen.** Der fest hinterlegte `RUNNER_SHA256` bleibt
-absichtlich auf dem bisherigen Stand; weder dieser Wert noch der externe
-Release-Pin werden hier erneuert. Der Broker sperrt daher den geänderten Runner
-bereits vor der Credential-Auswahl (`runner_changed`). Für einen späteren realen
-Lauf sind zunächst unabhängiger QA-/Security-Review des exakten finalen HEAD,
-separat überprüfte Runner-SHA-Freigabe sowie ein unabhängig bereitgestellter
-exakter Release-Pin zwingend. Ein grüner Testlauf ersetzt keinen dieser Schritte.
-Kein Self-Approval und keine Umgehung des Pins.
+**Weiterhin NICHT fuer einen realen Providerlauf freigegeben.** Der fest hinterlegte
+`RUNNER_SHA256` bleibt absichtlich auf dem bisherigen Stand; weder dieser Wert
+noch der externe Release-Pin werden hier erneuert. Der Broker sperrt deshalb
+den geaenderten Runner bereits vor der Credential-Auswahl (`runner_changed`).
+Die technischen QA-/Security-Reviews am finalen PR-HEAD waren Offline-PASS,
+**nicht** aber eine unabhaengige Freigabe des nun gemergten Release-Commits.
+Vor einem spaeteren realen GET-Lauf sind die neue unabhaengige Inventar- und
+Runner-SHA-Freigabe fuer den dann exakten Release-Commit, ein extern provisionierter
+Release-Pin, gepruefte Rollen-/Scope-Nachweise und eine ausdrueckliche, getrennte
+lokale Read-only-Betreiberfreigabe erforderlich. CI ersetzt keinen dieser Schritte.
+Kein Self-Approval, keine Eigen-Pin-Erstellung und keine Umgehung des alten Pins.
 
 Im anschließend separat freigegebenen, sauberen lokalen Release-Checkout:
 
@@ -177,8 +181,9 @@ beziehungsweise wegwerfbaren künstlichen Dateien geprüft.
 Die Python-3.11–3.13-CI verwendet weiterhin ausschließlich synthetische Fixtures
 und `DT_PROVIDER_OFFLINE=1`. Die Formatdiagnose läuft auch nach einem Lintfehler,
 damit beide Befunde sichtbar sind. Sicherheitschecks werden dadurch nicht grün.
-Der QA-/Security-Bericht im Draft-PR unterscheidet ausgeführte Prüfungen von
-noch ausstehendem unabhängigen Review. Kein Merge und keine Live-Aktivierung.
+Der historische R1-Entwicklungsbericht beschreibt den damaligen Draft-Status.
+Die abschliessenden [QA](https://github.com/oxfrd1337/developer-team/pull/45#issuecomment-6440044175)- und [Security](https://github.com/oxfrd1337/developer-team/pull/45#pullrequestreview-5665877727)-Berichte betreffen den spaeter gemergten PR-Tree. Die formale getrennte Revieweridentitaet bleibt `UNSUPPORTED`;
+der Code-Merge ist **keine** produktive Release-, Provider-GET- oder Live-Freigabe.
 
 **real_submissions=0 · LIVE=NO-GO · live_authorized=false.**
 **OFFLINE/CI PASS IS NOT LIVE AGENTS-API VALIDATION.**

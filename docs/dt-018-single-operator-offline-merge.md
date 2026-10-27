@@ -2,7 +2,7 @@
 
 **Antrag:** [Issue #50](https://github.com/oxfrd1337/developer-team/issues/50) · **Stand:** 25.10.2026 · **Geltung:** ausschließlich `oxfrd1337/developer-team`.
 
-**WICHTIG: Dieser Text ist bis zum eigenständigen, ausdrücklich manuell freigegebenen Merge des Governance-PRs nur ein Vorschlag.** Weder die Aufnahme eines Issues noch der PR selbst, grüne CI oder eine Codex-Antwort bewirken eine Freigabe. Die neue Regel darf ihre eigene Übernahme nicht autorisieren.
+**Status nach Integration am 27.10.2026:** Dieser Governance-Text wurde mit [PR #51](https://github.com/oxfrd1337/developer-team/pull/51), Merge-Commit `9a0b497ab104216731828c03f9f63a92b080b491`, unter `main` aufgenommen. Seine **eigene** erstmalige Übernahme wurde ausschliesslich nach dem vorher bestehenden DT-010-Verfahren manuell angewiesen, **nicht** durch die hier erst neu eingefuehrte DT-018-Regel. Das Dokument ist **keine allgemeine Freigabe**: Jeder weitere Offline-Merge braucht eine neue, begrenzte Betreiberentscheidung; reale Provider-GETs, Runtime-Pins und Live bleiben separat gesperrt.
 
 ## 1. Zweck und erlaubte Wirkung
 
@@ -72,7 +72,7 @@ Freigebender Betreiber / UTC-Zeit / Referenz: <ausfüllen>
 Keine Berechtigung für: Auto-Merge, Deployment, echte Provider-GETs, Agentenstart, LIVE, Admin-/Scope-/Spend-/Release-Pin-Änderungen
 ```
 
-Eine separat formulierte aktuelle Betreiberentscheidung ist nötig; eine Chatnachricht über den **Entwurf** dieses Verfahrens ist weder die Übernahme des Verfahrens noch die Freigabe von PR #45.
+Eine separat formulierte aktuelle Betreiberentscheidung ist **fuer jeden neuen PR** erforderlich. Eine Zustimmung zum Entwurf oder zu einem anderen PR kann niemals als Merge- oder Releasefreigabe fuer einen neuen Stand wiederverwendet werden.
 
 ## 6. Manuelle Abschlussprüfung und Merge
 
@@ -81,10 +81,14 @@ Eine separat formulierte aktuelle Betreiberentscheidung ist nötig; eine Chatnac
 3. Nur der Betreiber führt den manuellen GitHub-Merge aus. Der Controller und diese Dokumentation führen keinen GitHub-Merge aus, vergeben keine Rechte, setzen keine Checks auf `PASS` und erzeugen keine Freigabe-Datei.
 4. Nach dem Merge den tatsächlichen `main`-Commit und die betroffenen Issues dokumentieren. Ein Code-Merge lässt Runtime-/Host-/Cloud-/Release- oder Agents-API-Sperren unverändert. Freigabe für reale Read-only-Erhebung oder Live-Canary gehört in einen **separaten**, strengeren Prozess.
 
-## 7. Konkreter Bezug: Draft-PR #45
+## 7. Historischer Einzelfall: PR #45 integriert, keine Live-Freigabe
 
-Der [DT-017E-Draft-PR #45](https://github.com/oxfrd1337/developer-team/pull/45) hat technisch erfolgreiche neue [QA](https://github.com/oxfrd1337/developer-team/pull/45#issuecomment-6390675382)- und [Security](https://github.com/oxfrd1337/developer-team/pull/45#pullrequestreview-5640523882)-Berichte zum HEAD `225613d0c8114c3f9389da7b44dbaca404d337cc`. Der [CI-Lauf](https://github.com/oxfrd1337/developer-team/actions/runs/40140172442) hatte sechs erfolgreiche Jobs, je Python-Version 740 bestandene Tests und einen übersprungenen Hostisolationstest. Die formale Revieweridentität und die Host-/Live-Isolation bleiben `UNSUPPORTED`.
+Der ursprüngliche Draft [PR #45](https://github.com/oxfrd1337/developer-team/pull/45) wurde nach Aktualisierung auf die Zielbasis `9a0b497ab104216731828c03f9f63a92b080b491` neu geprüft. Geprüfter PR-HEAD `8146725af82cb5645ccb753fcd82ae1a29e6e199`, Tree `7f77d608776d8584924f5091ce5a3797eeab2535`.
 
-**Diese Fakten sind keine ausgefüllte Betreiberfreigabe.** Weil PR #45 geschützten Provider-/Credential-/Runner-Code ändert, benötigt er die zusätzliche manuelle Sicherheitsrisikoannahme; selbst ein späterer Offline-Merge gibt keinen realen Providerlauf frei. Ein vorheriger Merge dieses Governance-PRs in `main` würde außerdem die Basis von PR #45 ändern: CI-/Reviewbezüge vor einer anschließenden Entscheidung erneut prüfen und bei Stale-Befunden neu abnehmen.
+- [Finale QA](https://github.com/oxfrd1337/developer-team/pull/45#issuecomment-6440044175) und [finale Security](https://github.com/oxfrd1337/developer-team/pull/45#pullrequestreview-5665877727): **technisches PASS fuer Offline/Synthetik**. Formale Revieweridentitaet weiterhin `UNSUPPORTED`; Bubblewrap-/Hostisolation fuer Live `UNSUPPORTED`.
+- [CI am geprueften PR-HEAD](https://github.com/oxfrd1337/developer-team/actions/runs/40489665893): sechs erfolgreiche Pflichtchecks, je Python 3.11–3.13 **740 bestandene Tests + 1 Isolations-Skip**, 91 % Coverage.
+- [Einmalige Betreiberanweisung und begrenzte Risikoannahme](https://github.com/oxfrd1337/developer-team/pull/45#issuecomment-6440370871). Der Squash-Merge fuehrte zu `main`-Commit `4ec29a0ee27b0c306c65b299834679e45704c7a9` mit exakt demselben Tree.
 
-**Status bis zu gesonderten Entscheidungen:** DT-018-Vorschlag noch nicht aktiv; PR #45 nicht zur automatischen Freigabe berechtigt; `LIVE=NO-GO`.
+Dieser bereits abgeschlossene Fall ist **kein** Praezedenz-Merge-Token. Der durch DT-018 erlaubte organisatorische Offline-Merge beseitigt **keine** produktiven QA-/Reviewer-/Host-/Release-/Provider-/Operator-Gates. Ein neuer Commit oder eine neue Basis verlangt jeweils neue Nachweise und eine neue Betreiberentscheidung.
+
+Die naechste reine Release-Vorpruefung ist in [DT-017 – Read-only-Release-Preflight](dt-017-readonly-release-preflight.md) erfasst. **Keine reale Providererhebung freigegeben. `LIVE=NO-GO`.**
