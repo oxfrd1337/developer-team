@@ -1,14 +1,22 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
-## DT-018: manuelle Einzelbetreiber-Freigabe – Governance-Vorschlag
+## DT-018: manuelle Einzelbetreiber-Freigabe – dokumentiertes Offline-Verfahren
 
 [Offline-Code-Merge-Verfahren mit einzelnen Operatorentscheidungen](docs/dt-018-single-operator-offline-merge.md):
 Entwicklung, QA und Security bleiben getrennte Aufgaben; formal nicht nachgewiesene
 GitHub-Revieweridentitaeten werden nur fuer einen ausdruecklich vom Betreiber
 freigegebenen **manuellen Offline-Quellcode-Merge** als Restrisiko dokumentiert,
-niemals als PASS. Der Vorschlag gilt erst nach separat manuell genehmigtem Merge
-der Governance-Aenderung. Keine automatische Freigabe, kein Release-Pin-/Live-Bypass.
+niemals als PASS. Die Verfahrensdokumentation wurde mit [PR #51](https://github.com/oxfrd1337/developer-team/pull/51)
+unter `main` aufgenommen; jede weitere Offline-Mergeentscheidung bleibt separat,
+SHA-gebunden und manuell. Keine automatische Freigabe, kein Release-Pin-/Live-Bypass.
 **LIVE = NO-GO.**
+
+## DT-017 – kontrollierte Read-only-Release-Vorpruefung
+
+[Abnahme-Checkliste und aktuelle Sperren](docs/dt-017-readonly-release-preflight.md):
+Offline-Codeintegration von DT-017E ist abgeschlossen. Ein aktueller unabhaengiger
+Runner-/Release-Pin und reale Account-/Scope-/Spend-Nachweise fehlen; `LIVE=NO-GO`.
+Keine Keys, Provider-GETs oder Agents-API-POSTs ohne separate Freigabe.
 
 ## DT-017C: lokaler Prepare-/Broker-Helper
 

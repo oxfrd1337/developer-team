@@ -1,5 +1,12 @@
 # DT-017E: Test-, QA- und Security-Bericht
 
+**Historischer Erststand vor R1:** Die unten dokumentierte Merge-Sperre bezieht
+sich auf den damaligen Entwicklungsstand, nicht auf den bereits am 27.10.2026
+integrierten [PR #45](https://github.com/oxfrd1337/developer-team/pull/45).
+Die spaetere finale Offline-Abnahme steht im [PR](https://github.com/oxfrd1337/developer-team/pull/45#issuecomment-6440303900);
+weitere reale Release-/Provider-Gates bleiben unbewiesen. Aktuelle Luecken:
+[Release-Preflight](dt-017-readonly-release-preflight.md).
+
 **Historischer Entwicklungsstand vor R1:** Die nachfolgenden 725-Tests-Angaben
 gehören zu HEAD `749047443a9db533785073ff990ab21336e4a98e`. Die technischen
 Reviews #47/#48 bewerteten diesen Stand wegen QA-01 und QA-02/Security F1 als
