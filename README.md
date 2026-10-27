@@ -1,5 +1,15 @@
 # Universelles KI-Entwicklerteam · DT-001 / DT-002 / DT-003
 
+## DT-018: manuelle Einzelbetreiber-Freigabe – Governance-Vorschlag
+
+[Offline-Code-Merge-Verfahren mit einzelnen Operatorentscheidungen](docs/dt-018-single-operator-offline-merge.md):
+Entwicklung, QA und Security bleiben getrennte Aufgaben; formal nicht nachgewiesene
+GitHub-Revieweridentitaeten werden nur fuer einen ausdruecklich vom Betreiber
+freigegebenen **manuellen Offline-Quellcode-Merge** als Restrisiko dokumentiert,
+niemals als PASS. Der Vorschlag gilt erst nach separat manuell genehmigtem Merge
+der Governance-Aenderung. Keine automatische Freigabe, kein Release-Pin-/Live-Bypass.
+**LIVE = NO-GO.**
+
 ## DT-017C: lokaler Prepare-/Broker-Helper
 
 [Mac-Ablauf und sichere Rollenbindung](docs/dt-017c-local-readonly-broker.md):
